@@ -1,11 +1,11 @@
-# @magid/client-core
+# @magiden/client-core
 
 The framework-free client for the Magid storytelling server: transport, session and recovery
 protocol, response parsing and presentation semantics. No DOM and no framework, zero runtime dependencies. Use it from
 React, Angular, a plain page or Node, and only draw what it hands you.
 
 ```ts
-import { MagidClient, prepareDisplayText, truncateHtml } from '@magid/client-core';
+import { MagidClient, prepareDisplayText, truncateHtml } from '@magiden/client-core';
 
 const client = new MagidClient({ baseUrl: 'https://stories.example.org', clientType: 'pure' });
 
@@ -35,3 +35,7 @@ npm run typecheck
 npm run lint
 npm run build
 ```
+
+## License
+
+[Apache-2.0](LICENSE)

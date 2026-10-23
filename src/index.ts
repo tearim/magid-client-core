@@ -1,4 +1,4 @@
-// @magid/client-core: the framework-free Magid client. No React, no DOM (DOM helpers will live under '@magid/client-core/dom').
+// @magiden/client-core: the framework-free Magid client. No React, no DOM (DOM helpers will live under '@magiden/client-core/dom').
 export * from './protocol.ts';
 export * from './errorCodes.ts';
 export * from './anchors.ts';

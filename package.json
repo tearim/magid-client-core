@@ -1,8 +1,22 @@
 {
-  "name": "@magid/client-core",
-  "private": true,
+  "name": "@magiden/client-core",
   "version": "0.2.0",
   "description": "Framework-free Magid client: server protocol, response parsing and presentation semantics",
+  "keywords": [
+    "magid",
+    "storytelling",
+    "interactive-fiction",
+    "client"
+  ],
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tearim/magid-client-core.git"
+  },
+  "homepage": "https://github.com/tearim/magid-client-core#readme",
+  "bugs": {
+    "url": "https://github.com/tearim/magid-client-core/issues"
+  },
   "type": "module",
   "sideEffects": false,
   "exports": {

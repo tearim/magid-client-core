@@ -1,4 +1,4 @@
-// Where the client persists its session so it survives a reload. Browsers: wrap localStorage (see '@magid/client-core/dom'
+// Where the client persists its session so it survives a reload. Browsers: wrap localStorage (see '@magiden/client-core/dom'
 // once it exists, or pass { get: k => localStorage.getItem(k), set: (k, v) => localStorage.setItem(k, v) }).
 export interface KeyValueStorage {
   get(key: string): string | null;

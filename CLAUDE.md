@@ -50,7 +50,7 @@ exists, and records the current baseline. Then:
 
 ## What this is
 
-`@magid/client-core`: the framework-free client for the Magid server, a declarative storytelling engine. The server
+`@magiden/client-core` (npm scope `magiden` = Magid engine; `@magid` wasn't available): the framework-free client for the Magid server, a declarative storytelling engine. The server
 exposes `GET {baseUrl}?cmd=…` and returns one JSON payload per command describing what to render. This package does
 everything a renderer shouldn't have to: transport, session and recovery protocol, response parsing, config, and
 presentation semantics (typing, implied classes, inline CSS, sanitized HTML). Renderers (React, Angular, a plain `<div>`)
@@ -86,12 +86,12 @@ Don't delete the lockfile to "fix" dependency problems.
 
 ## Releasing
 
-`package.json` is still `"private": true`, so nothing can be published by accident. Before the first release the owner
-decides the scope name (`@magid` if the npm org is free, otherwise e.g. `@magiden`) and the license.
+Public on npm as `@magiden/client-core` (Apache-2.0, `LICENSE`); source on GitHub under the owner's account
+(`tearim/magid-client-core`). Publishing is the owner's step (`npm publish` with the account that owns `magiden`).
 - Versions follow semver; a wire-protocol change that needs a newer server, or any change to an export, is a major
-  (or, before 1.0, a minor) bump. Note changes in the commit messages; there's no changelog file yet.
+  (or, before 1.0, a minor) bump. Tag releases `vX.Y.Z`. Note changes in the commit messages; there's no changelog yet.
 - `prepublishOnly` runs type-check, lint and tests; `prepare` builds `dist/`, so a git dependency
-  (`github:<owner>/magid-client-core#vX.Y.Z`) builds on install.
+  (`github:tearim/magid-client-core#vX.Y.Z`) builds on install.
 
 ## Architecture (`src/`)
 
