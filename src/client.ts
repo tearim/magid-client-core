@@ -1,11 +1,11 @@
-import { isCommandAllowed, parseAllowedCommands } from './capabilities';
-import { parseResponse, type ParsedElement } from './elementFactory';
-import { ERROR_CODES, isConnectivityBlockingCode } from './errorCodes';
-import { parseHtmlPolicy, type HtmlPolicy } from './html';
-import type { ConfigData, DetachedElementResponse, ServerErrorPayload, XmlEntry } from './protocol';
-import { memoryStorage, STORAGE_KEYS, type KeyValueStorage } from './storage';
-import * as transport from './transport';
-import type { FetchLike, TransportConfig } from './transport';
+import { isCommandAllowed, parseAllowedCommands } from './capabilities.ts';
+import { parseResponse, type ParsedElement } from './elementFactory.ts';
+import { ERROR_CODES, isConnectivityBlockingCode } from './errorCodes.ts';
+import { parseHtmlPolicy, type HtmlPolicy } from './html.ts';
+import type { ConfigData, DetachedElementResponse, ServerErrorPayload, XmlEntry } from './protocol.ts';
+import { memoryStorage, STORAGE_KEYS, type KeyValueStorage } from './storage.ts';
+import * as transport from './transport.ts';
+import type { FetchLike, TransportConfig } from './transport.ts';
 
 export interface MagidClientState {
   baseUrl: string;

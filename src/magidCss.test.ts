@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseMagidCss } from './magidCss';
+import { parseMagidCss } from './magidCss.ts';
 
 describe('parseMagidCss', () => {
   it('camel-cases properties', () => {

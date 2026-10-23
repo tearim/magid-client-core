@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildCommandUrl, getXmlList, javaHashCode, sendCommand, type FetchLike, type TransportConfig } from './transport';
+import { buildCommandUrl, getXmlList, javaHashCode, sendCommand, type FetchLike, type TransportConfig } from './transport.ts';
 
 const BASE = 'http://localhost:8090';
 

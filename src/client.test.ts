@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { MagidClient, type MagidClientOptions } from './client';
-import { memoryStorage, STORAGE_KEYS } from './storage';
-import type { FetchLike } from './transport';
+import { MagidClient, type MagidClientOptions } from './client.ts';
+import { memoryStorage, STORAGE_KEYS } from './storage.ts';
+import type { FetchLike } from './transport.ts';
 
 const BASE = 'http://localhost:8090';
 

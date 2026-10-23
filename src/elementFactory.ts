@@ -1,4 +1,4 @@
-import { resolveAnchors } from './anchors';
+import { resolveAnchors } from './anchors.ts';
 import type {
   MenuResponse,
   NarrationResponse,
@@ -7,7 +7,7 @@ import type {
   VisualResponse,
   SessionResponse,
   DetachedElementResponse,
-} from './protocol';
+} from './protocol.ts';
 
 export type ParsedElement =
   | { type: 'menu'; data: MenuResponse }

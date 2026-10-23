@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   decodeEntities, htmlTextLength, parseHtml, parseHtmlPolicy, prepareDisplayText, truncateHtml, withFileRequestToken,
   type HtmlNode, type HtmlPolicy,
-} from './html';
+} from './html.ts';
 
 const policy: HtmlPolicy = { tags: ['b', 'i', 'img', 'p', 'span'], attributes: ['class', 'style', 'src'] };
 const text = (t: string): HtmlNode => ({ type: 'text', text: t });

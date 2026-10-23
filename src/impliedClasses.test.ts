@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyImpliedClasses, classPatternMatches } from './impliedClasses';
+import { applyImpliedClasses, classPatternMatches } from './impliedClasses.ts';
 
 describe('classPatternMatches', () => {
   it('matches a plain pattern only against the exact class string', () => {

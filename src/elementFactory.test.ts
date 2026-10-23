@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseResponse } from './elementFactory';
+import { parseResponse } from './elementFactory.ts';
 
 const BASE = 'http://localhost:8090';
 

@@ -7,6 +7,8 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "verbatimModuleSyntax": true,
+    // Imports name the .ts file; the build rewrites them to .js, which Node's ESM loader needs.
+    "allowImportingTsExtensions": true,
     "moduleDetection": "force",
     "strict": true,
     "skipLibCheck": true,

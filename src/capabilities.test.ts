@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { commandMatches, isCommandAllowed, parseAllowedCommands } from './capabilities';
+import { commandMatches, isCommandAllowed, parseAllowedCommands } from './capabilities.ts';
 
 const SPEC = 'common-file:request-file;core:list-actors,server-status,story-status,end-session;xml:list-xmls,set-xml';
 

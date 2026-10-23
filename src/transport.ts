@@ -1,5 +1,5 @@
-import { resolveAnchors, resolveInObject } from './anchors';
-import type { ServerStats, ServerStatus, XmlEntry } from './protocol';
+import { resolveAnchors, resolveInObject } from './anchors.ts';
+import type { ServerStats, ServerStatus, XmlEntry } from './protocol.ts';
 
 // The subset of WHATWG fetch the client needs; browsers, Node 18+ and Deno provide it as globalThis.fetch.
 // Inject your own (tests, proxies, extra headers) via TransportConfig.fetch.

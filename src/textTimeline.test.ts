@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { hasTimeLineStops, parseTextSegments } from './textTimeline';
+import { hasTimeLineStops, parseTextSegments } from './textTimeline.ts';
 
 describe('hasTimeLineStops', () => {
   it('returns true when DCSTP_ is present', () => {

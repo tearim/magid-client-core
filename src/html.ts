@@ -1,4 +1,4 @@
-import { hasTimeLineStops, resolveCleanText } from './textTimeline';
+import { hasTimeLineStops, resolveCleanText } from './textTimeline.ts';
 
 // Trusted HTML in display text (narration, menu description), limited to what the server allows (config vars
 // `allowed-tags` and `allowed-tag-attributes`, comma-separated). The text is parsed once into a tree; renderers build
