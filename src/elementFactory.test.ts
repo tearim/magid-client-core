@@ -18,6 +18,11 @@ describe('parseResponse', () => {
     expect(parseResponse(input, BASE)).toEqual([{ type: 'detached', data: { ...input, detached: 'by-anchor' } }]);
   });
 
+  it('parses an image the server marks detached by-anchor as one detached element', () => {
+    const input = { image: 'https://cataas.com/cat', detached: 'by-anchor', 'text-anchor': 'IMAGE_ANCHOR_1', 'element-type': 'image' };
+    expect(parseResponse(input, BASE)).toEqual([{ type: 'detached', data: input }]);
+  });
+
   it('gives an image object no other element, even with keys of other elements', () => {
     const result = parseResponse({ text: '', image: 'https://cataas.com/cat', 'element-type': 'image' }, BASE);
     expect(result.map((e) => e.type)).toEqual(['image']);

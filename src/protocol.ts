@@ -32,7 +32,8 @@ export interface DetachedElementResponse {
   'input-name'?: string;
   'input-value'?: string;
   'input-async'?: string;
-  // element-type: 'image' (sent with `text-anchor` only, no `detached`; the parser sets `by-anchor`)
+  // element-type: 'image' (the server sends `detached: 'by-anchor'` with `text-anchor`; the parser relies on
+  // `text-anchor` and sets `by-anchor` itself, so engines from before 2026-10-28 that sent no `detached` still work)
   image?: string;
   alt?: string;
   width?: string;

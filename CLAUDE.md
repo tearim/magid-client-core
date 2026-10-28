@@ -111,8 +111,10 @@ aliases only there, then extend the `ParsedElement` union and `protocol.ts`. `re
 
 The one exception is the **image** (`element-type: "image"`, from the server's `<img>`), recognized by its element-type
 because `image` is also an output field of other elements (`<show image="…">` → a narration with `image`). The server
-detaches an image whenever it can: inside a text it sends a `text-anchor` (and puts the anchor into that text), and the
-parser makes it a `detached` element with `detached: 'by-anchor'`; outside a text (no anchor) it is a standalone
+detaches an image whenever it can: inside a text (the nearest narration block: `<show>`, `<description>`, …) it sends
+`detached: "by-anchor"` with a `text-anchor` (and puts the anchor into that text), and the parser makes it a `detached`
+element with `detached: 'by-anchor'`, relying on `text-anchor` alone (older engines sent no `detached`); outside a text
+(no anchor) it is a standalone
 `{ type: 'image' }` (`ImageResponse`). Either way the object yields no other element. Unset fields (`alt`, `width`,
 `height`, `class`, `css`) are not sent at all.
 
