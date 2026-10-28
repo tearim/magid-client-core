@@ -7,6 +7,7 @@ import type {
   VisualResponse,
   SessionResponse,
   DetachedElementResponse,
+  ImageResponse,
 } from './protocol.ts';
 
 export type ParsedElement =
@@ -17,6 +18,7 @@ export type ParsedElement =
   | { type: 'visual'; data: VisualResponse }
   | { type: 'session'; data: SessionResponse }
   | { type: 'detached'; data: DetachedElementResponse }
+  | { type: 'image'; data: ImageResponse }
   | { type: 'responses'; elements: ParsedElement[] };
 
 type RawObject = Record<string, unknown>;
@@ -25,7 +27,7 @@ type ElementParser = (obj: RawObject, baseUrl: string) => ParsedElement;
 
 // Single source of truth: maps JSON key → parser function.
 // Multiple keys can map to the same ParsedElement type (aliases, per JFX ResponseNodeType).
-// Add new element types here only.
+// Add new element types here (the image, recognized by its element-type, is the one exception: see parseResponse).
 const ELEMENT_PARSERS: Record<string, ElementParser> = {
   // Menu aliases: "menu" | "menu-name"  (server uses "menu-name")
   menu:            (obj) => ({ type: 'menu',      data: obj as unknown as MenuResponse }),
@@ -80,6 +82,15 @@ export function parseResponse(json: object, baseUrl: string): ParsedElement[] {
       (item) => parseResponse(item, baseUrl)
     );
     return [{ type: 'responses', elements: children }];
+  }
+
+  // An image is recognized by its element-type, not by a key (`image` is also an output field of other elements). It is
+  // detached when it can be, i.e. when it has a text anchor (it stood inside a text), and on its own otherwise; either
+  // way it is the object's only element.
+  if (obj['element-type'] === 'image') {
+    return obj['text-anchor']
+      ? [{ type: 'detached', data: { ...obj, detached: 'by-anchor' } as unknown as DetachedElementResponse }]
+      : [{ type: 'image', data: obj as unknown as ImageResponse }];
   }
 
   // A single JSON object can contain multiple recognized keys (e.g. both "narration"

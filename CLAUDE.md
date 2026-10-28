@@ -109,6 +109,13 @@ known JSON key to a parser producing a `ParsedElement`; it is the *one* place th
 aliases only there, then extend the `ParsedElement` union and `protocol.ts`. `responses` arrays recurse through
 `parseResponse` and collapse into one `{ type: 'responses' }` node.
 
+The one exception is the **image** (`element-type: "image"`, from the server's `<img>`), recognized by its element-type
+because `image` is also an output field of other elements (`<show image="…">` → a narration with `image`). The server
+detaches an image whenever it can: inside a text it sends a `text-anchor` (and puts the anchor into that text), and the
+parser makes it a `detached` element with `detached: 'by-anchor'`; outside a text (no anchor) it is a standalone
+`{ type: 'image' }` (`ImageResponse`). Either way the object yields no other element. Unset fields (`alt`, `width`,
+`height`, `class`, `css`) are not sent at all.
+
 `resolveAnchors` / `resolveInObject` (`anchors.ts`) rewrite every `magid://` string to the active `baseUrl` at parse
 time, recursively. It is a plain prefix replacement, exactly like the server's `XmlBundleLoader`, so the valid form is
 `magid:///path` (the third slash starts the path).
@@ -124,9 +131,10 @@ signals); `subscribe` and `on('notice' | 'viewport')` observe it. Renderers neve
 - **Session elements** carry `session-id`/`file-request-token`/available XMLs/server metadata; applied in a pre-pass so
   the token is there before same-batch CSS loads. Session id and token persist through the injected `KeyValueStorage`
   (`STORAGE_KEYS`; in memory by default).
-- **Detached elements** (`type: 'detached'`) never render standalone: they're attached to every `menu` of the same batch
-  (`detached-elements`: `prepend`, `append`, or `by-anchor` via a `text-anchor` in the menu description). A new menu
-  resets `userInputs` to the batch's `input-value`s.
+- **Detached elements** (`type: 'detached'`) never render standalone. Each goes to the `narration` of its batch whose
+  text contains its `text-anchor` (`detached-elements` on that narration); the rest go to the batch's `menu`
+  (`prepend`, `append`, or `by-anchor` in the menu description). The server sends a detached element *before* the text
+  holding its anchor. A new menu resets `userInputs` to the batch's `input-value`s.
 - **Scene sync / freshness**: `currentScene` and the `freshness-key` var go out with every command. On a
   `status: 'error'` payload the client tells apart a stale session (dropped, a fresh one opened, the action not
   retried), a blocking `E01*` error (`connectivityBlockedError`), a scene mismatch (action dismissed, current menu
@@ -157,9 +165,11 @@ Otherwise:
   can't carry the Bearer header; external images are left alone so the token never leaves the server.
 
 Reports go through an `HtmlReport` (removals `warn`, transformations `log`). Renderers call
-`prepareDisplayText(raw, htmlPolicy, { baseUrl, fileRequestToken })` and re-parse when those change. It hands the
-typewriter only the visible text (with `DCSTP_` markers); `truncateHtml` cuts the tree by visible characters, so tags are
-never typed out: an element appears whole with its first character.
+`prepareDisplayText(raw, htmlPolicy, { baseUrl, fileRequestToken, anchors })` and re-parse when those change. It hands
+the typewriter only the visible text (with `DCSTP_` markers); `truncateHtml` cuts the tree by visible characters, so tags
+are never typed out: an element appears whole with its first character. `anchors` (the `text-anchor`s of the text's
+detached elements) become `{ type: 'anchor' }` nodes worth one visible character (`ANCHOR_CHAR`, U+FFFC, in the
+timeline): the renderer puts the detached element there, and it appears whole when its turn comes.
 
 ### Presentation semantics
 

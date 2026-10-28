@@ -84,6 +84,28 @@ describe('MagidClient: responses', () => {
     expect(c.getState().userInputs).toEqual({ name: 'Alia' });
   });
 
+  it('hands a detached element to the narration that holds its anchor, and the rest to the menu', async () => {
+    const hermit = { image: 'magid:///hermit.png', 'text-anchor': 'IMAGE_ANCHOR_1', 'element-type': 'image' };
+    const input = { detached: 'by-anchor', 'text-anchor': 'INPUT_ANCHOR_2', 'element-type': 'input', 'input-name': 'n' };
+    const standalone = { image: 'https://cataas.com/gif', 'element-type': 'image' };
+    const { fetch } = fakeServer({
+      responses: [standalone, hermit, { text: 'The Hermit IMAGE_ANCHOR_1and more' }, input,
+        { ...menu('gate'), 'menu-description': 'Name: INPUT_ANCHOR_2' }],
+    });
+    const { c } = client(fetch);
+
+    await c.send('');
+
+    const batch = c.getState().elements[0];
+    if (batch.type !== 'responses') throw new Error('expected a batch');
+    expect(batch.elements.map((e) => e.type)).toEqual(['image', 'narration', 'menu']);
+    const [image, narration, m] = batch.elements;
+    expect(image.type === 'image' && image.data.image).toBe('https://cataas.com/gif');
+    expect(narration.type === 'narration' && narration.data['detached-elements'])
+      .toEqual([{ ...hermit, image: `${BASE}/hermit.png`, detached: 'by-anchor' }]);
+    expect(m.type === 'menu' && m.data['detached-elements']).toEqual([input]);
+  });
+
   it('emits a viewport event for the view-port var', async () => {
     const { fetch } = fakeServer(config({ 'view-port': 'maximized' }));
     const { c } = client(fetch);

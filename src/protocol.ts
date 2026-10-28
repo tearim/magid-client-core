@@ -12,13 +12,14 @@ export interface MenuResponse {
   'menu-class'?: string;
   'menu-css'?: string;
   'menu-background-music'?: string;
-  // Populated client-side (magidStore's loadResponse pre-pass) from any "detached"
-  // elements in the same response batch — not present on the wire on this object.
+  // Populated client-side (MagidClient) with the detached elements of the same response batch that no narration
+  // claimed — not present on the wire on this object.
   'detached-elements'?: DetachedElementResponse[];
 }
 
-// An element whose markup lives outside the normal element stream: it must be
-// spliced into the accompanying menu's description (see magidStore's loadResponse).
+// An element whose markup lives outside the normal element stream. MagidClient hands it to the narration whose text
+// contains its `text-anchor`, otherwise to the menu of the same batch; the renderer puts it in place of the anchor
+// (`by-anchor`, see `prepareDisplayText`'s `anchors`) or before/after the menu description.
 export interface DetachedElementResponse {
   detached: 'by-anchor' | 'append' | 'prepend';
   'text-anchor'?: string;
@@ -31,6 +32,25 @@ export interface DetachedElementResponse {
   'input-name'?: string;
   'input-value'?: string;
   'input-async'?: string;
+  // element-type: 'image' (sent with `text-anchor` only, no `detached`; the parser sets `by-anchor`)
+  image?: string;
+  alt?: string;
+  width?: string;
+  height?: string;
+}
+
+// An image on its own (`<img>` outside a text): `element-type` "image" without `text-anchor`. `image` is the URL,
+// `magid:///` already resolved; files from the server still need the file-request-token (`withFileRequestToken`).
+// `width`/`height` are as the author wrote them (a bare number means pixels, as in HTML).
+export interface ImageResponse {
+  'element-type': 'image';
+  image: string;
+  alt?: string;
+  width?: string;
+  height?: string;
+  class?: string;
+  css?: string;
+  defer?: string;
 }
 
 export interface NarrationResponse {
@@ -39,6 +59,10 @@ export interface NarrationResponse {
   class?: string;
   css?: string;
   defer?: string;
+  // `<show image="…">`: an image shown with the narration (an output field; `magid:///` already resolved).
+  image?: string;
+  // Populated client-side (MagidClient): the batch's detached elements whose `text-anchor` is in this text.
+  'detached-elements'?: DetachedElementResponse[];
 }
 
 export interface CommandResponse {
@@ -81,6 +105,7 @@ export type ServerResponse =
   | ConfigResponse
   | VisualResponse
   | DetachedElementResponse
+  | ImageResponse
   | ResponsesWrapper;
 
 export interface XmlEntry {

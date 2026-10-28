@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  decodeEntities, htmlTextLength, parseHtml, parseHtmlPolicy, prepareDisplayText, truncateHtml, withFileRequestToken,
+  ANCHOR_CHAR, decodeEntities, htmlTextLength, parseHtml, parseHtmlPolicy, prepareDisplayText, truncateHtml,
+  withFileRequestToken,
   type HtmlNode, type HtmlPolicy,
 } from './html.ts';
 
@@ -186,5 +187,41 @@ describe('prepareDisplayText', () => {
 
   it('passes plain text through without a policy', () => {
     expect(prepareDisplayText('a <b>', null)).toEqual({ nodes: [text('a <b>')], timeline: 'a <b>' });
+  });
+});
+
+describe('anchors in display text', () => {
+  const anchor = (a: string): HtmlNode => ({ type: 'anchor', anchor: a });
+  const A = 'IMAGE_ANCHOR_ea46';
+  const B = 'IMAGE_ANCHOR_ba7c';
+
+  it('turns each anchor into an anchor node, also inside elements and without a policy', () => {
+    expect(prepareDisplayText(`The Hermit ${A}and <b>the cat: ${B}</b>`, policy, { anchors: [A, B] }).nodes)
+      .toEqual([text('The Hermit '), anchor(A), text('and '), el('b', [text('the cat: '), anchor(B)])]);
+    expect(prepareDisplayText(`x${A}y`, null, { anchors: [A] }).nodes).toEqual([text('x'), anchor(A), text('y')]);
+  });
+
+  it('counts an anchor as one character of the timeline', () => {
+    const { nodes, timeline } = prepareDisplayText(`ab${A}cd`, policy, { anchors: [A] });
+    expect(timeline).toBe(`ab${ANCHOR_CHAR}cd`);
+    expect(htmlTextLength(nodes)).toBe(5);
+  });
+
+  it('never reveals part of an anchor: it appears whole when its character is due', () => {
+    const { nodes } = prepareDisplayText(`ab${A}cd`, policy, { anchors: [A] });
+    expect(truncateHtml(nodes, 2)).toEqual([text('ab')]);
+    expect(truncateHtml(nodes, 3)).toEqual([text('ab'), anchor(A)]);
+    expect(truncateHtml(nodes, 4)).toEqual([text('ab'), anchor(A), text('c')]);
+  });
+
+  it('keeps anchors when the text has DCSTP_ markers', () => {
+    const { nodes, timeline } = prepareDisplayText(`DCSTP_0@a${A}DCSTP_500@b`, policy, { anchors: [A] });
+    expect(nodes).toEqual([text('a'), anchor(A), text('b')]);
+    expect(timeline).toBe(`DCSTP_0@a${ANCHOR_CHAR}DCSTP_500@b`);
+  });
+
+  it('leaves text alone without anchors, and ignores anchors the text does not contain', () => {
+    expect(prepareDisplayText(`x${A}`, policy).nodes).toEqual([text(`x${A}`)]);
+    expect(prepareDisplayText('plain', policy, { anchors: [A] }).nodes).toEqual([text('plain')]);
   });
 });

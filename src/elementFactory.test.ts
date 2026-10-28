@@ -4,6 +4,30 @@ import { parseResponse } from './elementFactory.ts';
 const BASE = 'http://localhost:8090';
 
 describe('parseResponse', () => {
+  it('parses an image without a text anchor as a standalone image element', () => {
+    const result = parseResponse(
+      { image: 'magid:///bundle/images/hermit.png', class: 'bouncy', alt: 'Hermit', 'element-type': 'image' }, BASE);
+    expect(result).toEqual([{
+      type: 'image',
+      data: { image: `${BASE}/bundle/images/hermit.png`, class: 'bouncy', alt: 'Hermit', 'element-type': 'image' },
+    }]);
+  });
+
+  it('parses an image with a text anchor as a detached by-anchor element', () => {
+    const input = { image: 'https://cataas.com/cat', 'text-anchor': 'IMAGE_ANCHOR_1', width: '200', 'element-type': 'image' };
+    expect(parseResponse(input, BASE)).toEqual([{ type: 'detached', data: { ...input, detached: 'by-anchor' } }]);
+  });
+
+  it('gives an image object no other element, even with keys of other elements', () => {
+    const result = parseResponse({ text: '', image: 'https://cataas.com/cat', 'element-type': 'image' }, BASE);
+    expect(result.map((e) => e.type)).toEqual(['image']);
+  });
+
+  it('keeps an image output field on a narration a narration', () => {
+    const result = parseResponse({ text: 'Look.', image: 'magid:///a.png' }, BASE);
+    expect(result).toEqual([{ type: 'narration', data: { text: 'Look.', narration: 'Look.', image: `${BASE}/a.png` } }]);
+  });
+
   it('parses a menu response via "menu" trigger key', () => {
     const input = {
       menu: 'start',

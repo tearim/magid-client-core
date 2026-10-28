@@ -2,7 +2,7 @@ import { isCommandAllowed, parseAllowedCommands } from './capabilities.ts';
 import { parseResponse, type ParsedElement } from './elementFactory.ts';
 import { ERROR_CODES, isConnectivityBlockingCode } from './errorCodes.ts';
 import { parseHtmlPolicy, type HtmlPolicy } from './html.ts';
-import type { ConfigData, DetachedElementResponse, ServerErrorPayload, XmlEntry } from './protocol.ts';
+import type { ConfigData, DetachedElementResponse, NarrationResponse, ServerErrorPayload, XmlEntry } from './protocol.ts';
 import { memoryStorage, STORAGE_KEYS, type KeyValueStorage } from './storage.ts';
 import * as transport from './transport.ts';
 import type { FetchLike, TransportConfig } from './transport.ts';
@@ -83,12 +83,28 @@ function isStaleSessionError(error: ServerErrorPayload): boolean {
   return error.message === 'Client id/File request token was not found';
 }
 
-// Detached elements don't render standalone — they're spliced into whichever menu shares their response batch.
+// Detached elements don't render standalone: each goes to the narration of its response batch whose text contains its
+// anchor, otherwise to the batch's menu.
 function collectDetached(elements: ParsedElement[], acc: DetachedElementResponse[]): void {
   for (const el of elements) {
     if (el.type === 'detached') acc.push(el.data);
     else if (el.type === 'responses') collectDetached(el.elements, acc);
   }
+}
+
+function narrationText(data: NarrationResponse): string {
+  return data.narration ?? data.text ?? '';
+}
+
+function collectNarrationTexts(elements: ParsedElement[], acc: string[]): void {
+  for (const el of elements) {
+    if (el.type === 'narration') acc.push(narrationText(el.data));
+    else if (el.type === 'responses') collectNarrationTexts(el.elements, acc);
+  }
+}
+
+function anchoredIn(text: string, detached: DetachedElementResponse[]): DetachedElementResponse[] {
+  return detached.filter((d) => d['text-anchor'] && text.includes(d['text-anchor']));
 }
 
 type Listener = (state: MagidClientState) => void;
@@ -266,6 +282,9 @@ export class MagidClient {
 
     const detachedElements: DetachedElementResponse[] = [];
     collectDetached(parsed, detachedElements);
+    const narrationTexts: string[] = [];
+    collectNarrationTexts(parsed, narrationTexts);
+    const forMenu = detachedElements.filter((d) => !narrationTexts.some((t) => anchoredIn(t, [d]).length > 0));
 
     // Pre-pass: apply session credentials before config so the file-request-token is available when CSS files from
     // the same response are loaded.
@@ -285,7 +304,11 @@ export class MagidClient {
         sawMenu = true;
         const name = el.data['menu-name'] ?? el.data.menu;
         if (name) this.set({ currentScene: name, menuClass: el.data['menu-class'] ?? '' });
-        return { ...el, data: { ...el.data, 'detached-elements': detachedElements } };
+        return { ...el, data: { ...el.data, 'detached-elements': forMenu } };
+      }
+      if (el.type === 'narration') {
+        const own = anchoredIn(narrationText(el.data), detachedElements);
+        if (own.length) return { ...el, data: { ...el.data, 'detached-elements': own } };
       }
       return el;
     };

@@ -15,6 +15,8 @@ import { hasTimeLineStops, resolveCleanText } from './textTimeline.ts';
 // - To show a literal tag that would otherwise parse, authors write `&lt;` (in the XML: `&amp;lt;`).
 // - Some allowed tags are transformed (TAG_PROCESSORS): `<title>` → `<span class="title">` (console log); an `<img>`
 //   from the Magid server gets the file-request-token.
+// - Anchors of detached elements (`options.anchors`, e.g. `IMAGE_ANCHOR_<uuid>`) become `anchor` nodes, one visible
+//   character each (ANCHOR_CHAR in the timeline), so the element appears whole and in order, never as typed-out text.
 
 export interface HtmlPolicy {
   tags: string[];
@@ -23,7 +25,12 @@ export interface HtmlPolicy {
 
 export type HtmlNode =
   | { type: 'text'; text: string }
-  | { type: 'element'; tag: string; attributes: Record<string, string>; children: HtmlNode[] };
+  | { type: 'element'; tag: string; attributes: Record<string, string>; children: HtmlNode[] }
+  // Where the detached element with this `text-anchor` goes.
+  | { type: 'anchor'; anchor: string };
+
+// An anchor's one character in the timeline (U+FFFC OBJECT REPLACEMENT CHARACTER).
+export const ANCHOR_CHAR = '\uFFFC';
 
 export const VOID_TAGS = ['area', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr'];
 
@@ -43,6 +50,8 @@ export interface HtmlOptions {
   // need `file-request-token`, since an <img> can't send the Bearer header.
   baseUrl?: string;
   fileRequestToken?: string | null;
+  // `text-anchor`s of the detached elements that belong to this text (prepareDisplayText).
+  anchors?: string[];
 }
 
 // `url` with the file-request-token if it points at the Magid server; anything else (external images) is unchanged,
@@ -333,12 +342,37 @@ export function parseHtml(
 
 export function htmlTextLength(nodes: HtmlNode[]): number {
   let n = 0;
-  for (const node of nodes) n += node.type === 'text' ? node.text.length : htmlTextLength(node.children);
+  for (const node of nodes) {
+    n += node.type === 'text' ? node.text.length : node.type === 'anchor' ? 1 : htmlTextLength(node.children);
+  }
   return n;
 }
 
 export function htmlToText(nodes: HtmlNode[]): string {
-  return nodes.map((node) => (node.type === 'text' ? node.text : htmlToText(node.children))).join('');
+  return nodes
+    .map((node) => (node.type === 'text' ? node.text : node.type === 'anchor' ? ANCHOR_CHAR : htmlToText(node.children)))
+    .join('');
+}
+
+// Splits text nodes at the given anchors (anywhere in the tree).
+export function splitAnchors(nodes: HtmlNode[], anchors: string[]): HtmlNode[] {
+  const keys = anchors.filter(Boolean);
+  if (!keys.length) return nodes;
+  const split = (text: string): HtmlNode[] => {
+    let at = -1;
+    let anchor = '';
+    for (const key of keys) {
+      const i = text.indexOf(key);
+      if (i !== -1 && (at === -1 || i < at)) [at, anchor] = [i, key];
+    }
+    if (at === -1) return text ? [{ type: 'text', text }] : [];
+    const before: HtmlNode[] = at > 0 ? [{ type: 'text', text: text.slice(0, at) }] : [];
+    return [...before, { type: 'anchor', anchor }, ...split(text.slice(at + anchor.length))];
+  };
+  return nodes.flatMap((node): HtmlNode[] => {
+    if (node.type === 'element') return [{ ...node, children: splitAnchors(node.children, keys) }];
+    return node.type === 'anchor' ? [node] : split(node.text);
+  });
 }
 
 // The first `visibleChars` characters of text, with every element they're in. An element (also an empty or void one,
@@ -354,6 +388,9 @@ export function truncateHtml(nodes: HtmlNode[], visibleChars: number): HtmlNode[
       if (node.type === 'text') {
         out.push(node.text.length <= remaining ? node : { type: 'text', text: node.text.slice(0, remaining) });
         remaining -= node.text.length;
+      } else if (node.type === 'anchor') {
+        out.push(node);
+        remaining -= 1;
       } else {
         out.push({ ...node, children: cut(node.children) });
       }
@@ -364,19 +401,19 @@ export function truncateHtml(nodes: HtmlNode[], visibleChars: number): HtmlNode[
 }
 
 // Display text → what the typewriter animates and what gets rendered. `timeline` is the visible text with its
-// DCSTP_ markers (feed it to the typewriter); `nodes` hold the same text without markers.
+// DCSTP_ markers (feed it to the typewriter) and an ANCHOR_CHAR per anchor; `nodes` hold the same text without markers.
 export function prepareDisplayText(
   raw: string,
   policy: HtmlPolicy | null,
   options?: HtmlOptions,
 ): { nodes: HtmlNode[]; timeline: string } {
-  const parsed = parseHtml(raw, policy, options);
+  const parsed = splitAnchors(parseHtml(raw, policy, options), options?.anchors ?? []);
   const timeline = htmlToText(parsed);
   if (!hasTimeLineStops(timeline)) return { nodes: parsed, timeline };
   const clean = (list: HtmlNode[]): HtmlNode[] =>
     list.map((node) =>
       node.type === 'text'
         ? { type: 'text', text: hasTimeLineStops(node.text) ? resolveCleanText(node.text) : node.text }
-        : { ...node, children: clean(node.children) });
+        : node.type === 'element' ? { ...node, children: clean(node.children) } : node);
   return { nodes: clean(parsed), timeline };
 }
