@@ -1,6 +1,6 @@
 {
   "name": "@magiden/client-core",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Framework-free Magid client: server protocol, response parsing and presentation semantics",
   "keywords": [
     "magid",
