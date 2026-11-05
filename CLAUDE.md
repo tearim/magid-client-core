@@ -97,7 +97,8 @@ Public on npm as `@magiden/client-core` (Apache-2.0, `LICENSE`); source on GitHu
 
 ### Transport (`transport.ts`)
 
-`sendCommand(config, cmd, extra)` → `GET {baseUrl}?cmd=…&client-type=…` with `Authorization: Bearer <session-id>`.
+`sendCommand(config, cmd, extra)` → `GET {baseUrl}?cmd=…&client-type=…` with `Magid-Session: <session-id>` (`SESSION_HEADER`; plain id, no
+`Bearer`). `Authorization` is reserved for a user's identity token and is not sent.
 `fetch` is injectable (`FetchLike`), so tests and non-browser runtimes supply their own. The renderer announces itself
 through `clientType` (`react`, `pure`, `angular`, …), which also selects `css-files-{clientType}`.
 
@@ -164,7 +165,7 @@ Otherwise:
 - **Transformed tags** (`TAG_PROCESSORS`, the one place for them): `<title>` → `<span class="title">` (console log),
   since a body `<title>` is invisible and React 19 hoists it into `<head>`. `<img>` from the Magid server (`src` starting
   with `baseUrl`, i.e. a resolved `magid:///…`) gets `file-request-token` (`withFileRequestToken`), since an image request
-  can't carry the Bearer header; external images are left alone so the token never leaves the server.
+  can't carry the `Magid-Session` header; external images are left alone so the token never leaves the server.
 
 Reports go through an `HtmlReport` (removals `warn`, transformations `log`). Renderers call
 `prepareDisplayText(raw, htmlPolicy, { baseUrl, fileRequestToken, anchors })` and re-parse when those change. It hands

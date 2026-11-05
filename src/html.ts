@@ -47,7 +47,7 @@ const consoleReport: HtmlReport = { warn: (m) => console.warn(m), log: (m) => co
 export interface HtmlOptions {
   report?: HtmlReport;
   // The server's address and the session's token: files from the server (`magid:///…`, already resolved to baseUrl)
-  // need `file-request-token`, since an <img> can't send the Bearer header.
+  // need `file-request-token`, since an <img> can't send the Magid-Session header.
   baseUrl?: string;
   fileRequestToken?: string | null;
   // `text-anchor`s of the detached elements that belong to this text (prepareDisplayText).

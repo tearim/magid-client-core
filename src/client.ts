@@ -347,12 +347,12 @@ export class MagidClient {
     return result;
   }
 
-  private transportConfig(authToken: string | null): TransportConfig {
-    return { baseUrl: this.state.baseUrl, clientType: this.clientType, fetch: this.fetchImpl, authToken: authToken ?? undefined };
+  private transportConfig(sessionId: string | null): TransportConfig {
+    return { baseUrl: this.state.baseUrl, clientType: this.clientType, fetch: this.fetchImpl, sessionId: sessionId ?? undefined };
   }
 
-  private request(cmd: string, extra: Record<string, string>, authToken: string | null): Promise<string> {
-    return transport.sendCommand(this.transportConfig(authToken), cmd, extra);
+  private request(cmd: string, extra: Record<string, string>, sessionId: string | null): Promise<string> {
+    return transport.sendCommand(this.transportConfig(sessionId), cmd, extra);
   }
 
   private userInputExtra(): Record<string, string> {
@@ -382,8 +382,8 @@ export class MagidClient {
     if (currentScene) extra['current-scene'] = currentScene;
 
     try {
-      const authToken = this.state.sessionId;
-      const raw = await this.request(cmd, extra, authToken);
+      const sessionId = this.state.sessionId;
+      const raw = await this.request(cmd, extra, sessionId);
       const serverError = parseServerError(raw);
 
       if (!serverError) {
@@ -426,7 +426,7 @@ export class MagidClient {
         const recoveryExtra: Record<string, string> = {};
         if (correctedKey) recoveryExtra['freshness-key'] = correctedKey;
         if (correctedScene) recoveryExtra['current-scene'] = correctedScene;
-        const recoveryRaw = await this.request('', recoveryExtra, authToken);
+        const recoveryRaw = await this.request('', recoveryExtra, sessionId);
         if (!parseServerError(recoveryRaw)) {
           this.loadResponse(recoveryRaw);
           this.set({ connected: true });
@@ -440,7 +440,7 @@ export class MagidClient {
       if (correctedKey) retryExtra['freshness-key'] = correctedKey;
       if (correctedScene) retryExtra['current-scene'] = correctedScene;
 
-      const retryRaw = await this.request(cmd, retryExtra, authToken);
+      const retryRaw = await this.request(cmd, retryExtra, sessionId);
       if (parseServerError(retryRaw)) {
         this.emit('notice', { message: 'Cannot synchronize with server — please try again or reconnect.' });
         return false;

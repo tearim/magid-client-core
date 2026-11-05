@@ -10,12 +10,15 @@ export interface FetchResponseLike {
 }
 export type FetchLike = (url: string, init?: { headers?: Record<string, string> }) => Promise<FetchResponseLike>;
 
+// The header that carries the session id (plain, no `Bearer`). `Authorization` is reserved for a user's identity token.
+export const SESSION_HEADER = 'Magid-Session';
+
 export interface TransportConfig {
   baseUrl: string;
   // Announced to the server as `client-type`; selects e.g. `<link client-type="…">` stylesheets. 'react', 'browser', …
   clientType: string;
-  // Session id, sent as `Authorization: Bearer …`.
-  authToken?: string;
+  // Session id, sent as the `Magid-Session` header.
+  sessionId?: string;
   fetch?: FetchLike;
 }
 
@@ -41,7 +44,7 @@ export function buildCommandUrl(config: TransportConfig, cmd: string, extra?: Re
 // protocol-level errors (`status: 'error'` payloads) come back as normal bodies.
 export async function sendCommand(config: TransportConfig, cmd: string, extra?: Record<string, string>): Promise<string> {
   const headers: Record<string, string> = {};
-  if (config.authToken) headers['Authorization'] = `Bearer ${config.authToken}`;
+  if (config.sessionId) headers[SESSION_HEADER] = config.sessionId;
   const res = await resolveFetch(config)(
     buildCommandUrl(config, cmd, extra),
     Object.keys(headers).length ? { headers } : undefined,

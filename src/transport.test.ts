@@ -34,10 +34,10 @@ describe('buildCommandUrl', () => {
 });
 
 describe('sendCommand', () => {
-  it('sends the session id as a Bearer token', async () => {
+  it('sends the session id in the Magid-Session header, not in Authorization', async () => {
     const { fetch, calls } = fakeFetch('{}');
-    await sendCommand(config(fetch, { authToken: 'sess-1' }), 'look');
-    expect(calls[0].headers).toEqual({ Authorization: 'Bearer sess-1' });
+    await sendCommand(config(fetch, { sessionId: 'sess-1' }), 'look');
+    expect(calls[0].headers).toEqual({ 'Magid-Session': 'sess-1' });
   });
 
   it('sends no headers without a session', async () => {

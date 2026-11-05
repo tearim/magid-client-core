@@ -5,7 +5,7 @@ import type { FetchLike } from './transport.ts';
 
 const BASE = 'http://localhost:8090';
 
-interface Request { cmd: string; params: Record<string, string>; auth?: string }
+interface Request { cmd: string; params: Record<string, string>; session?: string; authorization?: string }
 
 // Fake server: answers requests with scripted bodies in order and records what the client sent.
 function fakeServer(...bodies: (object | string | Error)[]) {
@@ -14,7 +14,7 @@ function fakeServer(...bodies: (object | string | Error)[]) {
     const u = new URL(url);
     const params: Record<string, string> = {};
     for (const [k, v] of (u.searchParams as unknown as Iterable<[string, string]>)) params[k] = v;
-    requests.push({ cmd: params.cmd, params, auth: init?.headers?.Authorization });
+    requests.push({ cmd: params.cmd, params, session: init?.headers?.['Magid-Session'], authorization: init?.headers?.Authorization });
     const body = bodies.shift();
     if (body === undefined) throw new Error(`unexpected request: ${url}`);
     if (body instanceof Error) throw body;
@@ -137,7 +137,7 @@ describe('MagidClient: requests', () => {
 
     expect(requests[1]).toEqual({
       cmd: 'go-down',
-      auth: 'Bearer sess-1',
+      session: 'sess-1',
       params: { cmd: 'go-down', 'client-type': 'browser', 'user-input-name': 'Alia', 'freshness-key': 'k1', 'current-scene': 'inn' },
     });
   });
@@ -148,7 +148,8 @@ describe('MagidClient: requests', () => {
     const { c } = client(fetch, { storage });
     expect(c.getState().serverConnected).toBe(true);
     await c.send('');
-    expect(requests[0].auth).toBe('Bearer old-sess');
+    expect(requests[0].session).toBe('old-sess');
+    expect(requests[0].authorization).toBeUndefined();
   });
 
   it('runs one command at a time', async () => {
@@ -237,7 +238,7 @@ describe('MagidClient: recovery', () => {
 
     await c.send('look');
 
-    expect(requests.map((r) => [r.cmd, r.auth])).toEqual([['look', 'Bearer dead'], ['', undefined]]);
+    expect(requests.map((r) => [r.cmd, r.session])).toEqual([['look', 'dead'], ['', undefined]]);
     expect(c.getState().sessionId).toBe('fresh');
     expect(storage.get(STORAGE_KEYS.SESSION_ID)).toBe('fresh');
     expect(c.getState().currentScene).toBe('inn');
@@ -403,7 +404,7 @@ describe('MagidClient: session end', () => {
 
     await c.endSession();
 
-    expect(requests[1]).toMatchObject({ cmd: 'end-session', auth: 'Bearer sess-1' });
+    expect(requests[1]).toMatchObject({ cmd: 'end-session', session: 'sess-1' });
     const s = c.getState();
     expect([s.sessionId, s.serverConnected, s.currentScene, s.envVars, s.elements]).toEqual([null, false, '', {}, []]);
     expect(storage.get(STORAGE_KEYS.SESSION_ID)).toBe('');

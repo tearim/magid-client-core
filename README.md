@@ -26,6 +26,12 @@ if (client.can('reload-xml')) await client.resetStory();
   `innerHTML`) and the visible text for typewriter effects.
 - `fetch` and storage are injectable (`MagidClientOptions`); by default the session lives in memory.
 
+## Changes
+
+- **0.4.0** (breaking): the session id is sent in the `Magid-Session` header instead of `Authorization: Bearer …`,
+  which the server now reserves for a user's identity token. Needs a server that reads `Magid-Session`.
+  `TransportConfig.authToken` is renamed `sessionId`.
+
 ## Development
 
 ```sh
