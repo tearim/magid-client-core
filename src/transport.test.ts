@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { buildCommandUrl, getXmlList, javaHashCode, sendCommand, type FetchLike, type TransportConfig } from './transport.ts';
+import {
+  buildCommandUrl, getXmlList, javaHashCode, sendCommand, sendStoryReply, type FetchLike, type TransportConfig,
+} from './transport.ts';
 
 const BASE = 'http://localhost:8090';
 
@@ -59,6 +61,31 @@ describe('sendCommand', () => {
   it('returns protocol error payloads as a normal body', async () => {
     const { fetch } = fakeFetch('{"status":"error","code":"E01001"}');
     expect(await sendCommand(config(fetch), 'look')).toBe('{"status":"error","code":"E01001"}');
+  });
+});
+
+describe('sendStoryReply', () => {
+  it('sends the reply as cmd=story-reply with the reply URL-encoded', async () => {
+    const { fetch, calls } = fakeFetch('{}');
+    await sendStoryReply(config(fetch, { sessionId: 'sess-1' }), 'help@Show me help', { 'freshness-key': 'k1' });
+    expect(calls[0].url).toContain('reply=help%40Show+me+help');
+    const params = new URL(calls[0].url).searchParams;
+    expect([params.get('cmd'), params.get('reply'), params.get('freshness-key')]).toEqual(['story-reply', 'help@Show me help', 'k1']);
+    expect(calls[0].headers).toEqual({ 'Magid-Session': 'sess-1' });
+  });
+
+  it('sends a reply named like a server command as a story reply', async () => {
+    const { fetch, calls } = fakeFetch('{}');
+    await sendStoryReply(config(fetch), 'list-xmls');
+    const params = new URL(calls[0].url).searchParams;
+    expect([params.get('cmd'), params.get('reply')]).toEqual(['story-reply', 'list-xmls']);
+  });
+
+  it('asks for the current menu with an empty cmd and no reply', async () => {
+    const { fetch, calls } = fakeFetch('{}');
+    await sendStoryReply(config(fetch), '');
+    const params = new URL(calls[0].url).searchParams;
+    expect([params.get('cmd'), params.get('reply')]).toEqual(['', null]);
   });
 });
 

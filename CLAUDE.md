@@ -51,7 +51,8 @@ exists, and records the current baseline. Then:
 ## What this is
 
 `@magiden/client-core` (npm scope `magiden` = Magid engine; `@magid` wasn't available): the framework-free client for the Magid server, a declarative storytelling engine. The server
-exposes `GET {baseUrl}?cmd=…` and returns one JSON payload per command describing what to render. This package does
+exposes `GET {baseUrl}?cmd=…` (`cmd` names a server command; a reply to the story is `cmd=story-reply&reply=…`) and
+returns one JSON payload per request describing what to render. This package does
 everything a renderer shouldn't have to: transport, session and recovery protocol, response parsing, config, and
 presentation semantics (typing, implied classes, inline CSS, sanitized HTML). Renderers (React, Angular, a plain `<div>`)
 only draw what `MagidClient` hands them.
@@ -99,6 +100,10 @@ Public on npm as `@magiden/client-core` (Apache-2.0, `LICENSE`); source on GitHu
 
 `sendCommand(config, cmd, extra)` → `GET {baseUrl}?cmd=…&client-type=…` with `Magid-Session: <session-id>` (`SESSION_HEADER`; plain id, no
 `Bearer`). `Authorization` is reserved for a user's identity token and is not sent.
+`cmd` only ever names a server command. A reply to the story (menu choice, `update-symbol`) goes through
+`sendStoryReply(config, reply, extra)` → `cmd=story-reply&reply=<reply>` (`STORY_REPLY`), whatever the reply is called;
+`''` (start a session / current menu) stays `cmd=`. In `MagidClient` the kind is explicit, never guessed from the name:
+`send(reply)` is always a story reply, `selectStory`/`resetStory`/`endSession`/`refreshXmlList` are server actions.
 `fetch` is injectable (`FetchLike`), so tests and non-browser runtimes supply their own. The renderer announces itself
 through `clientType` (`react`, `pure`, `angular`, …), which also selects `css-files-{clientType}`.
 
@@ -141,13 +146,13 @@ signals); `subscribe` and `on('notice' | 'viewport')` observe it. Renderers neve
 - **Scene sync / freshness**: `currentScene` and the `freshness-key` var go out with every command. On a
   `status: 'error'` payload the client tells apart a stale session (dropped, a fresh one opened, the action not
   retried), a blocking `E01*` error (`connectivityBlockedError`), a scene mismatch (action dismissed, current menu
-  re-fetched, `notice`) and a freshness-key mismatch (same command retried once with the corrected key).
+  re-fetched, `notice`) and a freshness-key mismatch (same request, `story-reply` and `reply` included, retried once with the corrected key).
 - **Story loading** (`selectStory` = `set-xml`, `resetStory` = `reload-xml`) first drops stylesheets, vars, scene and
   inputs. Commands run **one at a time** (queue).
 - **Server settings in config** (not story vars; kept across story loads; cleared on session end / server change):
   - `allowed-commands` (`group:action,action;group:action`, parsed by `capabilities.ts`) → `state.allowedCommands`.
     `can(command)` tells the UI what to offer, and the client refuses disallowed commands locally (no request). Only the
-    server actions in `SERVER_ACTIONS` are gated; story commands always pass. Not announced yet = everything allowed.
+    server actions in `SERVER_ACTIONS` are gated; story replies (`send`) are never checked. Not announced yet = everything allowed.
     The operator's `disabledCommands` (`'reload-xml'` or `'xml:reload-xml'`) always win.
   - `allowed-tags` / `allowed-tag-attributes` (comma-separated) → `state.htmlPolicy`; see "HTML in display text".
 

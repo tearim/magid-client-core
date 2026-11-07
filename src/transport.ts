@@ -40,8 +40,12 @@ export function buildCommandUrl(config: TransportConfig, cmd: string, extra?: Re
   return url.toString();
 }
 
-// GET {baseUrl}?cmd=…; returns the raw body with magid:// anchors resolved. Throws on HTTP errors and network failures;
-// protocol-level errors (`status: 'error'` payloads) come back as normal bodies.
+// The command that carries a reply to the story; `cmd` itself only ever names server commands.
+export const STORY_REPLY = 'story-reply';
+
+// GET {baseUrl}?cmd=…: a server command. Returns the raw body with magid:// anchors resolved. Throws on HTTP errors and
+// network failures; protocol-level errors (`status: 'error'` payloads) come back as normal bodies.
+// Replies to the story (menu choices, `update-symbol`) go through sendStoryReply, never as `cmd`.
 export async function sendCommand(config: TransportConfig, cmd: string, extra?: Record<string, string>): Promise<string> {
   const headers: Record<string, string> = {};
   if (config.sessionId) headers[SESSION_HEADER] = config.sessionId;
@@ -52,6 +56,13 @@ export async function sendCommand(config: TransportConfig, cmd: string, extra?: 
   if (!res.ok) throw new Error(`Server returned ${res.status}`);
   const text = await res.text();
   return resolveAnchors(text, config.baseUrl);
+}
+
+// A reply to the story (a menu choice, `update-symbol`, …), sent as `cmd=story-reply&reply=…` whatever its name, so it
+// can't be mistaken for a server command. '' asks for the current menu (or starts a session) and goes out as `cmd=`.
+export function sendStoryReply(config: TransportConfig, reply: string, extra?: Record<string, string>): Promise<string> {
+  if (reply === '') return sendCommand(config, '', extra);
+  return sendCommand(config, STORY_REPLY, { ...extra, reply });
 }
 
 export async function getXmlList(config: TransportConfig): Promise<XmlEntry[]> {

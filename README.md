@@ -16,6 +16,7 @@ client.subscribe((state) => {
 client.on('notice', ({ message }) => console.info(message));
 
 await client.send('');                 // open a session / fetch the current menu
+await client.send('go-north');         // reply to the story: cmd=story-reply&reply=go-north
 if (client.can('reload-xml')) await client.resetStory();
 ```
 
@@ -28,6 +29,11 @@ if (client.can('reload-xml')) await client.resetStory();
 
 ## Changes
 
+- **0.5.0** (breaking): replies to the story are sent as `cmd=story-reply&reply=<reply>`; `cmd` only names server
+  commands, so a story can use any word, even one named like a server command. `send(reply)` always sends a story reply
+  (`''` still goes out as `cmd=`); `selectStory`/`resetStory` and the other server actions keep `cmd=<name>`. New:
+  `sendStoryReply`, `STORY_REPLY`. Needs a server that knows `story-reply`; an older one takes `story-reply` itself as the
+  player's reply.
 - **0.4.0** (breaking): the session id is sent in the `Magid-Session` header instead of `Authorization: Bearer …`,
   which the server now reserves for a user's identity token. Needs a server that reads `Magid-Session`.
   `TransportConfig.authToken` is renamed `sessionId`.

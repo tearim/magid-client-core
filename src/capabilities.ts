@@ -5,8 +5,9 @@
 // both are qualified and equal, or when their action parts are equal.
 
 // Server actions the client knows about (story-server/agnostic: AgnosticMagidServer, MagidServerCoreActions,
-// MagidServerUnsafeCodeActions, …). Only these are gated by `allowed-commands`; anything else is a story command (a
-// menu choice) and always allowed.
+// MagidServerUnsafeCodeActions, …). Only these are gated by `allowed-commands`; other names pass. Replies to the story
+// (menu choices) aren't commands at all: they go out as `cmd=story-reply&reply=…` and are never checked here, so a
+// story may use any word, including a server action's name.
 export const SERVER_ACTIONS = [
   'request-file',
   'list-actors', 'server-stats', 'server-status', 'story-status', 'end-session',

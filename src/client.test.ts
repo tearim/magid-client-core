@@ -136,10 +136,50 @@ describe('MagidClient: requests', () => {
     await c.send('go-down');
 
     expect(requests[1]).toEqual({
-      cmd: 'go-down',
+      cmd: 'story-reply',
       session: 'sess-1',
-      params: { cmd: 'go-down', 'client-type': 'browser', 'user-input-name': 'Alia', 'freshness-key': 'k1', 'current-scene': 'inn' },
+      params: {
+        cmd: 'story-reply', reply: 'go-down', 'client-type': 'browser', 'user-input-name': 'Alia', 'freshness-key': 'k1',
+        'current-scene': 'inn',
+      },
     });
+  });
+
+  it('sends a reply named like a server action as a story reply', async () => {
+    const { fetch, requests } = fakeServer(
+      { responses: [session, config({ 'allowed-commands': 'core:server-status' }), menu('inn')] },
+      menu('farewell'),
+    );
+    const { c, notices } = client(fetch, { disabledCommands: ['end-session'] });
+    await c.send('');
+
+    await c.send('end-session');
+
+    expect(requests[1].params).toMatchObject({ cmd: 'story-reply', reply: 'end-session' });
+    expect(notices).toEqual([]);
+    expect(c.getState().currentScene).toBe('farewell');
+  });
+
+  it('sends a reply with @ and spaces intact', async () => {
+    const { fetch, requests } = fakeServer(menu('help'));
+    const { c } = client(fetch);
+
+    await c.send('help@Show me help & more');
+
+    expect(requests[0].params).toMatchObject({ cmd: 'story-reply', reply: 'help@Show me help & more' });
+  });
+
+  it('asks for the current menu with an empty cmd and no reply', async () => {
+    const { fetch, requests } = fakeServer({ responses: [session, menu('inn')] }, menu('inn'));
+    const { c } = client(fetch);
+
+    await c.send('');
+    await c.send('');
+
+    expect(requests.map((r) => r.params)).toEqual([
+      { cmd: '', 'client-type': 'browser' },
+      { cmd: '', 'client-type': 'browser', 'current-scene': 'inn' },
+    ]);
   });
 
   it('uses a session restored from storage', async () => {
@@ -157,10 +197,10 @@ describe('MagidClient: requests', () => {
     const gate = new Promise<void>((r) => { release = r; });
     const started: string[] = [];
     const fetch: FetchLike = async (url) => {
-      const cmd = new URL(url).searchParams.get('cmd') ?? '';
-      started.push(cmd);
-      if (cmd === 'slow') await gate;
-      return { ok: true, status: 200, text: async () => JSON.stringify(menu(cmd || 'start')) };
+      const reply = new URL(url).searchParams.get('reply') ?? '';
+      started.push(reply);
+      if (reply === 'slow') await gate;
+      return { ok: true, status: 200, text: async () => JSON.stringify(menu(reply || 'start')) };
     };
     const { c } = client(fetch);
 
@@ -238,7 +278,10 @@ describe('MagidClient: recovery', () => {
 
     await c.send('look');
 
-    expect(requests.map((r) => [r.cmd, r.session])).toEqual([['look', 'dead'], ['', undefined]]);
+    expect(requests.map((r) => [r.cmd, r.params.reply, r.session])).toEqual([
+      ['story-reply', 'look', 'dead'],
+      ['', undefined, undefined],
+    ]);
     expect(c.getState().sessionId).toBe('fresh');
     expect(storage.get(STORAGE_KEYS.SESSION_ID)).toBe('fresh');
     expect(c.getState().currentScene).toBe('inn');
@@ -283,7 +326,8 @@ describe('MagidClient: recovery', () => {
     await c.send('drink');
 
     expect(requests[2].params).toEqual({
-      cmd: 'drink', 'client-type': 'browser', 'user-input-toast': 'to Alia', 'freshness-key': 'k2', 'current-scene': 'inn',
+      cmd: 'story-reply', reply: 'drink', 'client-type': 'browser', 'user-input-toast': 'to Alia', 'freshness-key': 'k2',
+      'current-scene': 'inn',
     });
     expect(c.getState().envVars['freshness-key']).toBe('k2');
     expect(notices).toEqual([]);
@@ -293,7 +337,8 @@ describe('MagidClient: recovery', () => {
     const { fetch, requests } = fakeServer(error({ 'freshness-key': 'k2' }), menu('oasis'));
     const { c } = client(fetch);
     await c.selectStory('oasis.xml');
-    expect(requests[1].params.path).toBe('oasis.xml');
+    expect(requests[1].params).toMatchObject({ cmd: 'set-xml', path: 'oasis.xml', 'freshness-key': 'k2' });
+    expect(requests[1].params).not.toHaveProperty('reply');
   });
 
   it('gives up after one failed retry', async () => {
@@ -357,10 +402,9 @@ describe('MagidClient: capabilities', () => {
 
     expect(c.can('reload-xml')).toBe(false);
     expect(await c.resetStory()).toBe(false);
-    await c.send('xml:reload-xml');
 
     expect(requests).toHaveLength(0);
-    expect(notices).toHaveLength(2);
+    expect(notices).toHaveLength(1);
   });
 
   it('does not ask the server for the XML list when list-xmls is not allowed', async () => {

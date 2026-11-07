@@ -63,6 +63,11 @@ export interface MagidClientOptions {
 // Commands that load a story from scratch: the previous story's CSS, vars, scene and inputs are dropped first.
 const STORY_LOADING_COMMANDS = ['reload-xml', 'set-xml'];
 
+// What a request asks for: a server action (`cmd=<action>`, gated by allowed-commands) or a reply to the story
+// (`cmd=story-reply&reply=…`, always allowed; '' asks for the current menu). The kind is never guessed from the name.
+type Command = { action: string; params?: Record<string, string> } | { reply: string };
+const CURRENT_MENU: Command = { reply: '' };
+
 // Server settings in config: applied to state, not passed on as story vars. Kept across story loads.
 const ALLOWED_COMMANDS = 'allowed-commands';
 const ALLOWED_TAGS = 'allowed-tags';
@@ -184,27 +189,28 @@ export class MagidClient {
   // ---- capabilities ----------------------------------------------------------------------------------------------
 
   // Whether the UI should offer a command (e.g. 'reload-xml' for a reset button). Server actions need to be in the
-  // server's `allowed-commands` (everything is allowed until it announces them); story commands always pass; the
-  // operator's disabledCommands always win. Disabled commands are refused locally.
+  // server's `allowed-commands` (everything is allowed until it announces them); other names pass; the operator's
+  // disabledCommands always win. Disabled actions are refused locally. Story replies (send) are never checked.
   can(command: string): boolean {
     return isCommandAllowed(command, this.state.allowedCommands, this.disabledCommands);
   }
 
   // ---- commands --------------------------------------------------------------------------------------------------
 
-  // Sends a story command (button press, '' for "current menu"). Queued: resolves when this command has finished.
-  send(cmd: string): Promise<void> {
-    return this.enqueue(() => this.run(cmd)).then(() => undefined);
+  // Sends a reply to the story (button press, `update-symbol`, '' for "current menu") as `cmd=story-reply`, even when
+  // it is named like a server action. Queued: resolves when this reply has been handled.
+  send(reply: string): Promise<void> {
+    return this.enqueue(() => this.run({ reply })).then(() => undefined);
   }
 
   // Loads another story (set-xml). Resolves to false when the client refused it or the server rejected the XML.
   selectStory(xmlPath: string): Promise<boolean> {
-    return this.enqueue(() => this.run('set-xml', { path: xmlPath }));
+    return this.enqueue(() => this.run({ action: 'set-xml', params: { path: xmlPath } }));
   }
 
   // Restarts the current story (reload-xml). Resolves to false when refused or rejected.
   resetStory(): Promise<boolean> {
-    return this.enqueue(() => this.run('reload-xml'));
+    return this.enqueue(() => this.run({ action: 'reload-xml' }));
   }
 
   setUserInput(name: string, value: string): void {
@@ -351,8 +357,10 @@ export class MagidClient {
     return { baseUrl: this.state.baseUrl, clientType: this.clientType, fetch: this.fetchImpl, sessionId: sessionId ?? undefined };
   }
 
-  private request(cmd: string, extra: Record<string, string>, sessionId: string | null): Promise<string> {
-    return transport.sendCommand(this.transportConfig(sessionId), cmd, extra);
+  private request(command: Command, extra: Record<string, string>, sessionId: string | null): Promise<string> {
+    const config = this.transportConfig(sessionId);
+    if ('reply' in command) return transport.sendStoryReply(config, command.reply, extra);
+    return transport.sendCommand(config, command.action, { ...extra, ...command.params });
   }
 
   private userInputExtra(): Record<string, string> {
@@ -362,20 +370,21 @@ export class MagidClient {
   }
 
   // Runs one command including the sync/session recovery protocol. Never throws; failures end up in state/notices.
-  private async run(cmd: string, cmdExtra: Record<string, string> = {}): Promise<boolean> {
-    if (!this.can(cmd)) {
-      this.emit('notice', { message: `"${cmd}" is not available.` });
+  private async run(command: Command): Promise<boolean> {
+    const action = 'action' in command ? command.action : null;
+    if (action !== null && !this.can(action)) {
+      this.emit('notice', { message: `"${action}" is not available.` });
       return false;
     }
 
     this.set({ isLoading: true, error: null, elements: [] });
 
-    if (STORY_LOADING_COMMANDS.includes(cmd)) {
+    if (action !== null && STORY_LOADING_COMMANDS.includes(action)) {
       // A new story is loaded: its config (incl. freshness-key) arrives with the response.
       this.set({ stylesheets: [], currentScene: '', menuClass: '', envVars: {}, userInputs: {} });
     }
 
-    const extra: Record<string, string> = { ...this.userInputExtra(), ...cmdExtra };
+    const extra: Record<string, string> = this.userInputExtra();
     const freshnessKey = this.state.envVars['freshness-key'];
     if (freshnessKey) extra['freshness-key'] = freshnessKey;
     const currentScene = this.state.currentScene;
@@ -383,7 +392,7 @@ export class MagidClient {
 
     try {
       const sessionId = this.state.sessionId;
-      const raw = await this.request(cmd, extra, sessionId);
+      const raw = await this.request(command, extra, sessionId);
       const serverError = parseServerError(raw);
 
       if (!serverError) {
@@ -395,7 +404,7 @@ export class MagidClient {
       // Stale session: credentials rejected by the server — drop them and re-establish.
       if (isStaleSessionError(serverError)) {
         this.clearSession();
-        const recoveryRaw = await this.request('', {}, null);
+        const recoveryRaw = await this.request(CURRENT_MENU, {}, null);
         if (!parseServerError(recoveryRaw)) {
           this.loadResponse(recoveryRaw);
           this.set({ connected: true });
@@ -426,7 +435,7 @@ export class MagidClient {
         const recoveryExtra: Record<string, string> = {};
         if (correctedKey) recoveryExtra['freshness-key'] = correctedKey;
         if (correctedScene) recoveryExtra['current-scene'] = correctedScene;
-        const recoveryRaw = await this.request('', recoveryExtra, sessionId);
+        const recoveryRaw = await this.request(CURRENT_MENU, recoveryExtra, sessionId);
         if (!parseServerError(recoveryRaw)) {
           this.loadResponse(recoveryRaw);
           this.set({ connected: true });
@@ -434,13 +443,13 @@ export class MagidClient {
         return false;
       }
 
-      // Freshness key mismatch: retry the same command once with the corrected key.
+      // Freshness key mismatch: retry the same request (same reply or action) once with the corrected key.
       this.set({ envVars, ...(correctedScene !== undefined && { currentScene: correctedScene }) });
-      const retryExtra: Record<string, string> = { ...this.userInputExtra(), ...cmdExtra };
+      const retryExtra: Record<string, string> = this.userInputExtra();
       if (correctedKey) retryExtra['freshness-key'] = correctedKey;
       if (correctedScene) retryExtra['current-scene'] = correctedScene;
 
-      const retryRaw = await this.request(cmd, retryExtra, sessionId);
+      const retryRaw = await this.request(command, retryExtra, sessionId);
       if (parseServerError(retryRaw)) {
         this.emit('notice', { message: 'Cannot synchronize with server — please try again or reconnect.' });
         return false;
