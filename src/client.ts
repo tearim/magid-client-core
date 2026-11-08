@@ -60,6 +60,21 @@ export interface MagidClientOptions {
   disabledCommands?: string[];
 }
 
+// The session's `available-xmls`: the server sends it as a JSON string; an array or `{ xmls: [...] }` is taken as is.
+function xmlListOf(value: unknown): XmlEntry[] {
+  let parsed = value;
+  if (typeof value === 'string') {
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      return [];
+    }
+  }
+  if (Array.isArray(parsed)) return parsed as XmlEntry[];
+  const xmls = (parsed as { xmls?: unknown } | null)?.xmls;
+  return Array.isArray(xmls) ? xmls as XmlEntry[] : [];
+}
+
 // Commands that load a story from scratch: the previous story's CSS, vars, scene and inputs are dropped first.
 const STORY_LOADING_COMMANDS = ['reload-xml', 'set-xml'];
 
@@ -492,7 +507,7 @@ export class MagidClient {
       patch.fileRequestToken = token;
       this.storage.set(STORAGE_KEYS.FILE_REQUEST_TOKEN, token);
     }
-    if (xmls) patch.xmlList = Array.isArray(xmls) ? xmls : (xmls as Record<string, unknown>)?.['xmls'] as XmlEntry[] ?? [];
+    if (xmls) patch.xmlList = xmlListOf(xmls);
     if (serverName !== undefined) patch.serverName = serverName;
     if (serverVersion !== undefined) patch.serverVersion = serverVersion;
     if (serverDescription !== undefined) patch.serverDescription = serverDescription;

@@ -132,7 +132,8 @@ export interface ServerErrorPayload {
 export interface SessionResponse {
   'session-id': string;
   'file-request-token': string;
-  'available-xmls'?: XmlEntry[];
+  // The server sends a JSON string holding the list; MagidClient parses it into state.xmlList.
+  'available-xmls'?: XmlEntry[] | string;
   'server-name'?: string;
   'server-version'?: string;
   'server-description'?: string;

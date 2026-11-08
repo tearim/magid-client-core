@@ -123,6 +123,31 @@ describe('MagidClient: responses', () => {
   });
 });
 
+describe('MagidClient: session', () => {
+  const oasis = { name: 'Oasis', description: 'A desert story', path: 'C:/content/oasis/oasis.xml' };
+
+  it('takes the story list from available-xmls as the server sends it (a JSON string)', async () => {
+    const { fetch } = fakeServer({ responses: [{ ...session, 'available-xmls': JSON.stringify([oasis]) }, menu('inn')] });
+    const { c } = client(fetch);
+    await c.send('');
+    expect(c.getState().xmlList).toEqual([oasis]);
+  });
+
+  it('takes the story list from available-xmls as an array', async () => {
+    const { fetch } = fakeServer({ responses: [{ ...session, 'available-xmls': [oasis] }, menu('inn')] });
+    const { c } = client(fetch);
+    await c.send('');
+    expect(c.getState().xmlList).toEqual([oasis]);
+  });
+
+  it('leaves the story list empty when available-xmls is not a list', async () => {
+    const { fetch } = fakeServer({ responses: [{ ...session, 'available-xmls': 'not json' }, menu('inn')] });
+    const { c } = client(fetch);
+    await c.send('');
+    expect(c.getState().xmlList).toEqual([]);
+  });
+});
+
 describe('MagidClient: requests', () => {
   it('sends session, freshness key, current scene and user inputs with the next command', async () => {
     const { fetch, requests } = fakeServer(

@@ -29,6 +29,8 @@ if (client.can('reload-xml')) await client.resetStory();
 
 ## Changes
 
+- **0.6.1**: the story list the server sends with a new session (`available-xmls`, a JSON string) reaches
+  `state.xmlList`; it used to stay empty until `refreshXmlList`.
 - **0.6.0**: `scopeStylesheet(css, scope)` scopes a stylesheet to an embedded Magid (a shadow root with
   `':host'`, or a selector such as `'#magid-app'`); `@font-face`/`@property` come back separately for the page.
 - **0.5.1**: only the first `type-by-*` class counts, so an explicit `type-by-letter-*` is no longer overridden by an
