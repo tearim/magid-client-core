@@ -185,6 +185,7 @@ timeline): the renderer puts the detached element there, and it appears whole wh
   (`parseTextSegments`, `resolveCleanText`, `hasTimeLineStops`).
 - **Typing styles** (`typingConfig.ts`, `getConsequentalTypingConfig`): classes `type-by-letter-{ms|slow|normal|fast|rapid}`
   / `type-by-word-{…}` (named speeds: slow 30, normal 20, fast 10, rapid 5 ms) and `animation-resets-{ms}` (plural).
+  Only the first `type-by-*` class counts, whichever family: explicit classes come before implied ones, so they win.
 - **Implied classes** (`impliedClasses.ts`, `applyImpliedClasses`): vars `implied-classes-of: pattern, …` add classes to
   elements whose **whole** class string matches: `x` equals, `x*` starts with, `*x` ends with, `*x*` contains. No
   chaining, no duplicates, explicit classes first. Renderers derive them (never mutate the data) and re-derive when

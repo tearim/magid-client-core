@@ -29,6 +29,8 @@ if (client.can('reload-xml')) await client.resetStory();
 
 ## Changes
 
+- **0.5.1**: only the first `type-by-*` class counts, so an explicit `type-by-letter-*` is no longer overridden by an
+  implied `type-by-word-*` (the config used to set both, and renderers picked word).
 - **0.5.0** (breaking): replies to the story are sent as `cmd=story-reply&reply=<reply>`; `cmd` only names server
   commands, so a story can use any word, even one named like a server command. `send(reply)` always sends a story reply
   (`''` still goes out as `cmd=`); `selectStory`/`resetStory` and the other server actions keep `cmd=<name>`. New:

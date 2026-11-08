@@ -1,5 +1,5 @@
 // Typing style from a narration/menu class string: type-by-letter-{ms|slow|normal|fast|rapid},
-// type-by-word-{…}, animation-resets-{ms}.
+// type-by-word-{…}, animation-resets-{ms}. Only the first type-by-* class counts.
 export interface TypingConfig { typeEachLetter: boolean; typeEachWord: boolean; typeElementMs: number, animationResets: number }
 
 const NAMED_SPEEDS: Record<string, number> = {
@@ -11,8 +11,11 @@ const NAMED_SPEEDS: Record<string, number> = {
 
 export function getConsequentalTypingConfig(className?: string): TypingConfig {
   if (!className) return { typeEachLetter: false, typeEachWord: false,  typeElementMs: 0, animationResets: 0  };
-  const match = className.match(/\btype-by-letter-(\S+)/);
-  const wordMatch= className.match(/\btype-by-word-(\S+)/);
+  // The first type-by-* class wins, whichever family it is: explicit classes come before implied ones
+  // (applyImpliedClasses appends), so an implied type-by-word-* can't override an explicit type-by-letter-*.
+  const firstMatch = className.match(/\btype-by-(letter|word)-(\S+)/);
+  const match = firstMatch?.[1] === 'letter' ? [firstMatch[0], firstMatch[2]] : null;
+  const wordMatch = firstMatch?.[1] === 'word' ? [firstMatch[0], firstMatch[2]] : null;
   const resetsMatch = className.match(/\banimation-resets-(\S+)/);
   let resets = 0;
   if (resetsMatch) {
