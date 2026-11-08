@@ -29,6 +29,8 @@ if (client.can('reload-xml')) await client.resetStory();
 
 ## Changes
 
+- **0.7.0**: `typingSchedule(timeline, typingConfig, skip)`: the typewriter's timing (`DCSTP_` offsets, typing by
+  letter or word) as `{ text, steps: [{ at, length }] }`, so every renderer types the same way.
 - **0.6.1**: the story list the server sends with a new session (`available-xmls`, a JSON string) reaches
   `state.xmlList`; it used to stay empty until `refreshXmlList`.
 - **0.6.0**: `scopeStylesheet(css, scope)` scopes a stylesheet to an embedded Magid (a shadow root with

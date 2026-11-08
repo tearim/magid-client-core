@@ -5,6 +5,7 @@ export * from './anchors.ts';
 export * from './elementFactory.ts';
 export * from './textTimeline.ts';
 export * from './typingConfig.ts';
+export * from './typingSchedule.ts';
 export * from './impliedClasses.ts';
 export * from './magidCss.ts';
 export * from './scopeStylesheet.ts';
