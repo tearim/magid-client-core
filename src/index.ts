@@ -7,6 +7,7 @@ export * from './textTimeline.ts';
 export * from './typingConfig.ts';
 export * from './impliedClasses.ts';
 export * from './magidCss.ts';
+export * from './scopeStylesheet.ts';
 export * from './capabilities.ts';
 export * from './html.ts';
 export * from './transport.ts';

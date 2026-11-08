@@ -90,7 +90,7 @@ Don't delete the lockfile to "fix" dependency problems.
 Public on npm as `@magiden/client-core` (Apache-2.0, `LICENSE`); source on GitHub under the owner's account
 (`tearim/magid-client-core`). Publishing is the owner's step (`npm publish` with the account that owns `magiden`).
 - Versions follow semver; a wire-protocol change that needs a newer server, or any change to an export, is a major
-  (or, before 1.0, a minor) bump. Tag releases `vX.Y.Z`. Note changes in the commit messages; there's no changelog yet.
+  (or, before 1.0, a minor) bump. Tag releases `vX.Y.Z`. Note changes in the commit messages and in README "Changes".
 - `prepublishOnly` runs type-check, lint and tests; `prepare` builds `dist/`, so a git dependency
   (`github:tearim/magid-client-core#vX.Y.Z`) builds on install.
 
@@ -194,3 +194,10 @@ timeline): the renderer puts the detached element there, and it appears whole wh
   prop, or `Object.assign(el.style, …)`). Bare `left`/`top`/… numbers get `px` and imply `position: absolute`.
   `-mg-abs-x`/`-mg-abs-y` act like `left`/`top` and win over them (as in the JFX client). Window-level `-mg-*`
   (`-mg-window-*`, `-mg-resizable`, `-mg-screen`) and JavaFX-only `-fx-*` are dropped.
+- **Scoped stylesheets** (`scopeStylesheet.ts`, `scopeStylesheet(css, scope)`), for a Magid embedded in someone else's
+  page: `':host'` (CSS for a shadow root) rewrites only `:root`/`html`/`body` → `:host` (`body.x` → `:host(.x)`); an id
+  scope (CSS for the page's `<head>`) prefixes every selector and turns those into the scope. Rules inside
+  `@media`/`@supports`/`@container`/`@layer`/`@starting-style` are scoped too, `@keyframes` and statements are kept,
+  `@font-face`/`@property` come back as `documentCss` (they don't work in a shadow root). A small scanner (strings,
+  comments, parentheses), not regexes over the whole sheet. Story `url()`s are `magid:///`, resolved by the server
+  when the sheet is fetched, so URLs aren't rewritten.

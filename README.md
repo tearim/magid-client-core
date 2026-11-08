@@ -29,6 +29,8 @@ if (client.can('reload-xml')) await client.resetStory();
 
 ## Changes
 
+- **0.6.0**: `scopeStylesheet(css, scope)` scopes a stylesheet to an embedded Magid (a shadow root with
+  `':host'`, or a selector such as `'#magid-app'`); `@font-face`/`@property` come back separately for the page.
 - **0.5.1**: only the first `type-by-*` class counts, so an explicit `type-by-letter-*` is no longer overridden by an
   implied `type-by-word-*` (the config used to set both, and renderers picked word).
 - **0.5.0** (breaking): replies to the story are sent as `cmd=story-reply&reply=<reply>`; `cmd` only names server
