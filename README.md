@@ -42,12 +42,28 @@ client.closeStreams();                                  // e.g. when the view un
 ```
 
 Display text gets this for free: `prepareDisplayText` turns each placeholder into a `stream` node (one character of
-the timeline, like an anchor); render it as `state.streams[id]?.text ?? ''`, kept current. Stream text is plain text:
+the timeline, like an anchor); render it as `state.streams[id]?.text ?? ''`, kept current, on an element with the
+classes `streamClassName(state.streams[id])`:
+
+| Class | When |
+|---|---|
+| `magid-stream` | always |
+| `magid-stream-warming-up` | before the stream's first text: the tag's warm-up message ("The wizard ponders…"), or nothing |
+| `magid-stream-receiving` | the text is arriving |
+| `magid-stream-finished` | the stream has ended; with `magid-stream-ok`, `-failed`, `-cancelled` or `-timeout` |
+
+Streaming is not typing. Typing (`type-by-letter-*`, `type-by-word-*`, `DCSTP_` pauses; `typingSchedule`) is an
+animation the client plays over a text it already has. A stream is text that doesn't exist yet: it appears as it
+arrives, never typed out. The typewriter reaches the stream's place as one unit, shows what has arrived so far and
+moves on; the stream goes on growing there. Stream text is plain text:
 never insert it as HTML. The pieces (`StreamTracker`, `StreamConnection`,
 `parseStreamMessage`, `streamIdsOf`) are exported for renderers that manage streams themselves.
 
 ## Changes
 
+- **0.9.1**: stream phases: `StreamState.phase` (`warming-up`, `receiving`, `finished`; a snapshot marked
+  `warm-up` holds a tag's warm-up message); `streamClassName(state)`, the classes a renderer puts on a stream's
+  element (`magid-stream-open` is gone: `-warming-up` and `-receiving` replace it).
 - **0.9.0**: `prepareDisplayText` turns stream placeholders into `stream` nodes (`HtmlNode` gains a variant: a
   renderer's tree walk must handle it); `splitStreams`, `splitStreamPlaceholders`.
 - **0.8.0**: streamed texts (`streams: true`, `fillStreams`, `closeStreams`, the `stream` event, `state.streams`,

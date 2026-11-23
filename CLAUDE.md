@@ -168,7 +168,9 @@ replaces the text; `done` replaces it with `value` and ends the stream. An entry
 placeholder `⟪stream:<id>⟫` per stream. Display text: `prepareDisplayText` turns each placeholder into a `stream` node
 (`HtmlNode`, one `ANCHOR_CHAR` in the timeline, like an anchor); once the typewriter reaches it, the renderer shows
 `state.streams[id].text` there as plain text and keeps it current (the stream itself is never typed out). Texts that
-aren't display text use `fillStreams(text)`. Stream text is plain text, never markup.
+aren't display text use `fillStreams(text)`. Stream text is plain text, never markup. `StreamState.phase`:
+`warming-up` (before the first text; a snapshot marked `warm-up` holds the tag's warm-up message), `receiving`,
+`finished`; `streamClassName(state)` gives the element's classes (README table), so every renderer names them alike.
 
 ### HTML in display text (`html.ts`)
 

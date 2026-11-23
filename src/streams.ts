@@ -32,6 +32,8 @@ export const STREAM_SNAPSHOT_COMMAND = 'stream-snapshot';
 export const STREAM_TOKEN_PARAM = 'stream-token';
 export const STREAM_ID_PARAM = 'stream-id';
 export const ACCEPT_STREAMS_PARAM = 'accept-streams';
+// Marks a snapshot that holds a tag's warm-up message ("The wizard ponders…"), shown until the stream's first text.
+export const WARM_UP_FIELD = 'warm-up';
 
 export function streamPlaceholder(id: string): string {
   return STREAM_PLACEHOLDER_START + id + STREAM_PLACEHOLDER_END;
@@ -47,12 +49,19 @@ export type StreamStatus = 'ok' | 'failed' | 'cancelled' | 'timeout';
 
 export type StreamMessage =
   | { 'stream-id': string; no: number; delta: string }
-  | { 'stream-id': string; no: number; snapshot: string }
+  | { 'stream-id': string; no: number; snapshot: string; 'warm-up'?: boolean }
   | { 'stream-id': string; done: true; status: StreamStatus | string; value: string };
+
+// Where a stream stands:
+// - warming-up: nothing of the stream's own text yet; `text` is the tag's warm-up message, or '';
+// - receiving: the text is arriving;
+// - finished: the stream has ended (`status` says how).
+export type StreamPhase = 'warming-up' | 'receiving' | 'finished';
 
 // What a client knows of one stream.
 export interface StreamState {
   text: string;
+  phase: StreamPhase;
   // The last delta's number applied (or the number a snapshot stands at).
   no: number;
   // A delta was missed: deltas are ignored until a snapshot or the end. Ask for a snapshot (StreamConnection does).
@@ -84,6 +93,7 @@ export function parseStreamMessage(data: unknown): StreamMessage | null {
 // 1. a delta numbered last + 1 is appended; any other number is a gap: deltas are ignored until a snapshot or the end;
 // 2. a snapshot replaces the text and sets the number deltas go on from;
 // 3. the end replaces the text with its value, whatever came before;
+//    (a snapshot marked `warm-up` holds the tag's warm-up message: the phase stays `warming-up` until real text comes;)
 // 4. messages of streams no entry has listed yet are kept all the same (an entry may still come);
 // 5. stream text is plain text: insert it as text, never as markup (fillStreams returns text for a text node).
 export class StreamTracker {
@@ -92,17 +102,19 @@ export class StreamTracker {
   // Applies a message. Returns the stream's state when it changed, null when the message was ignored.
   handle(message: StreamMessage): StreamState | null {
     const id = message['stream-id'];
-    const state = this.streams.get(id) ?? { text: '', no: 0, gap: false, finished: false };
+    const state: StreamState = this.streams.get(id) ?? { text: '', phase: 'warming-up', no: 0, gap: false, finished: false };
     if (state.finished) return null;
     if ('done' in message) {
-      Object.assign(state, { text: message.value, finished: true, status: message.status, gap: false });
+      Object.assign(state, { text: message.value, phase: 'finished', finished: true, status: message.status, gap: false });
     } else if ('snapshot' in message) {
-      Object.assign(state, { text: message.snapshot, no: message.no, gap: false });
+      const phase = message[WARM_UP_FIELD] === true ? 'warming-up' : 'receiving';
+      Object.assign(state, { text: message.snapshot, phase, no: message.no, gap: false });
     } else if (state.gap) {
       return null;
     } else if (message.no === state.no + 1) {
       state.text += message.delta;
       state.no = message.no;
+      state.phase = 'receiving';
     } else {
       state.gap = true;
       this.streams.set(id, state);
@@ -132,6 +144,17 @@ export class StreamTracker {
   clear(): void {
     this.streams.clear();
   }
+}
+
+// The classes a renderer puts on a stream's element, so every client marks it the same way and a story's CSS can style
+// it: always `magid-stream`; then the phase, `magid-stream-warming-up` (before the stream's first text: the warm-up
+// message, or nothing), `magid-stream-receiving` or `magid-stream-finished`; once finished also its status,
+// `magid-stream-ok`, `-failed`, `-cancelled` or `-timeout`. A stream nothing has arrived of is warming up.
+export function streamClassName(state: StreamState | undefined): string {
+  const phase = state?.phase ?? 'warming-up';
+  const classes = ['magid-stream', `magid-stream-${phase}`];
+  if (phase === 'finished') classes.push(`magid-stream-${state?.status ?? 'ok'}`);
+  return classes.join(' ');
 }
 
 // The parts of EventSource the connection uses; inject one for tests or a polyfill.

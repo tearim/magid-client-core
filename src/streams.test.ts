@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
-  parseStreamMessage, splitStreamPlaceholders, StreamConnection, streamIdsOf, streamPlaceholder, StreamTracker,
+  parseStreamMessage, splitStreamPlaceholders, streamClassName, StreamConnection, streamIdsOf, streamPlaceholder, StreamTracker,
   type EventSourceLike, type StreamMessage,
 } from './streams.ts';
 import { MagidClient } from './client.ts';
@@ -11,6 +11,7 @@ const ID = 'str-1';
 
 const delta = (no: number, text: string, id = ID): StreamMessage => ({ 'stream-id': id, no, delta: text });
 const snapshot = (no: number, text: string, id = ID): StreamMessage => ({ 'stream-id': id, no, snapshot: text });
+const warmUp = (text: string, id = ID): StreamMessage => ({ 'stream-id': id, no: 0, snapshot: text, 'warm-up': true });
 const done = (value: string, status = 'ok', id = ID): StreamMessage => ({ 'stream-id': id, done: true, status, value });
 
 // An EventSource that records its URL; the test sends messages through `emit`.
@@ -278,5 +279,60 @@ describe('splitStreamPlaceholders', () => {
 
   it('returns a text without placeholders whole', () => {
     expect(splitStreamPlaceholders('plain')).toEqual(['plain']);
+  });
+});
+
+describe('stream phases', () => {
+  it('shows a warm-up message', () => {
+    const t = new StreamTracker();
+    t.handle(warmUp('The wizard ponders…'));
+    expect(t.stateOf(ID)).toMatchObject({ text: 'The wizard ponders…', phase: 'warming-up' });
+  });
+
+  it('is receiving after the first text replaces the warm-up', () => {
+    const t = new StreamTracker();
+    t.handle(warmUp('The wizard ponders…'));
+    t.handle(snapshot(0, 'Fix '));
+    expect(t.stateOf(ID)).toMatchObject({ text: 'Fix ', phase: 'receiving' });
+  });
+
+  it('is receiving after a delta', () => {
+    const t = new StreamTracker();
+    t.handle(delta(1, 'Fix '));
+    expect(t.stateOf(ID)?.phase).toBe('receiving');
+  });
+
+  it('is finished at the end', () => {
+    const t = new StreamTracker();
+    t.handle(done('Fixed.'));
+    expect(t.stateOf(ID)?.phase).toBe('finished');
+  });
+
+  it('keeps the warm-up marker when parsing', () => {
+    expect(parseStreamMessage(JSON.stringify(warmUp('Wait…')))).toEqual(warmUp('Wait…'));
+  });
+});
+
+describe('streamClassName', () => {
+  const tracked = (...messages: StreamMessage[]) => {
+    const t = new StreamTracker();
+    messages.forEach((m) => t.handle(m));
+    return t.stateOf(ID);
+  };
+
+  it('marks a stream nothing has arrived of as warming up', () => {
+    expect(streamClassName(undefined)).toBe('magid-stream magid-stream-warming-up');
+  });
+
+  it('marks a warm-up', () => {
+    expect(streamClassName(tracked(warmUp('Wait…')))).toBe('magid-stream magid-stream-warming-up');
+  });
+
+  it('marks a receiving stream', () => {
+    expect(streamClassName(tracked(delta(1, 'Fix ')))).toBe('magid-stream magid-stream-receiving');
+  });
+
+  it('marks a finished stream with its status', () => {
+    expect(streamClassName(tracked(done('No.', 'failed')))).toBe('magid-stream magid-stream-finished magid-stream-failed');
   });
 });
