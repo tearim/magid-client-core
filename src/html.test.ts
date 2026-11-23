@@ -4,6 +4,7 @@ import {
   withFileRequestToken,
   type HtmlNode, type HtmlPolicy,
 } from './html.ts';
+import { streamPlaceholder } from './streams.ts';
 
 const policy: HtmlPolicy = { tags: ['b', 'i', 'img', 'p', 'span'], attributes: ['class', 'style', 'src'] };
 const text = (t: string): HtmlNode => ({ type: 'text', text: t });
@@ -223,5 +224,50 @@ describe('anchors in display text', () => {
   it('leaves text alone without anchors, and ignores anchors the text does not contain', () => {
     expect(prepareDisplayText(`x${A}`, policy).nodes).toEqual([text(`x${A}`)]);
     expect(prepareDisplayText('plain', policy, { anchors: [A] }).nodes).toEqual([text('plain')]);
+  });
+});
+
+describe('streams in display text', () => {
+  const stream = (id: string): HtmlNode => ({ type: 'stream', id });
+  const S = streamPlaceholder('str-1');
+  const A = 'IMAGE_ANCHOR_ea46';
+
+  it('turns a placeholder into a stream node', () => {
+    expect(prepareDisplayText(`He says: ${S} and waits.`, policy).nodes)
+      .toEqual([text('He says: '), stream('str-1'), text(' and waits.')]);
+  });
+
+  it('finds a placeholder inside an element', () => {
+    expect(prepareDisplayText(`<b>${S}</b>`, policy).nodes).toEqual([el('b', [stream('str-1')])]);
+  });
+
+  it('finds a placeholder without a policy', () => {
+    expect(prepareDisplayText(`x${S}`, null).nodes).toEqual([text('x'), stream('str-1')]);
+  });
+
+  it('finds two placeholders in one text', () => {
+    expect(prepareDisplayText(`${S}${streamPlaceholder('str-2')}`, policy).nodes).toEqual([stream('str-1'), stream('str-2')]);
+  });
+
+  it('counts a stream as one character of the timeline', () => {
+    expect(prepareDisplayText(`ab${S}cd`, policy).timeline).toBe(`ab${ANCHOR_CHAR}cd`);
+  });
+
+  it('reveals a stream node when its character is due', () => {
+    const { nodes } = prepareDisplayText(`ab${S}cd`, policy);
+    expect(truncateHtml(nodes, 3)).toEqual([text('ab'), stream('str-1')]);
+  });
+
+  it('keeps a stream node when the text has DCSTP_ markers', () => {
+    expect(prepareDisplayText(`DCSTP_0@a${S}DCSTP_500@b`, policy).nodes).toEqual([text('a'), stream('str-1'), text('b')]);
+  });
+
+  it('keeps an anchor and a stream side by side', () => {
+    expect(prepareDisplayText(`${A}${S}`, policy, { anchors: [A] }).nodes)
+      .toEqual([{ type: 'anchor', anchor: A }, stream('str-1')]);
+  });
+
+  it('leaves a broken placeholder as text', () => {
+    expect(prepareDisplayText('⟪stream:⟫', policy).nodes).toEqual([text('⟪stream:⟫')]);
   });
 });

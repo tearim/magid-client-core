@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
-  parseStreamMessage, StreamConnection, streamIdsOf, streamPlaceholder, StreamTracker,
+  parseStreamMessage, splitStreamPlaceholders, StreamConnection, streamIdsOf, streamPlaceholder, StreamTracker,
   type EventSourceLike, type StreamMessage,
 } from './streams.ts';
 import { MagidClient } from './client.ts';
@@ -264,5 +264,19 @@ describe('MagidClient: streams', () => {
     es.emit(delta(3, 'late'));
     await vi.waitFor(() => expect(c.getState().streams[ID]?.text).toBe('all of it'));
     expect([server.requests[1].cmd, server.requests[1]['stream-id']]).toEqual(['stream-snapshot', ID]);
+  });
+});
+
+describe('splitStreamPlaceholders', () => {
+  it('splits a text at its placeholders', () => {
+    expect(splitStreamPlaceholders(`a${streamPlaceholder('s1')}b`)).toEqual(['a', { stream: 's1' }, 'b']);
+  });
+
+  it('leaves out empty pieces', () => {
+    expect(splitStreamPlaceholders(streamPlaceholder('s1'))).toEqual([{ stream: 's1' }]);
+  });
+
+  it('returns a text without placeholders whole', () => {
+    expect(splitStreamPlaceholders('plain')).toEqual(['plain']);
   });
 });

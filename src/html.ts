@@ -1,4 +1,5 @@
 import { hasTimeLineStops, resolveCleanText } from './textTimeline.ts';
+import { splitStreamPlaceholders } from './streams.ts';
 
 // Trusted HTML in display text (narration, menu description), limited to what the server allows (config vars
 // `allowed-tags` and `allowed-tag-attributes`, comma-separated). The text is parsed once into a tree; renderers build
@@ -17,6 +18,9 @@ import { hasTimeLineStops, resolveCleanText } from './textTimeline.ts';
 //   from the Magid server gets the file-request-token.
 // - Anchors of detached elements (`options.anchors`, e.g. `IMAGE_ANCHOR_<uuid>`) become `anchor` nodes, one visible
 //   character each (ANCHOR_CHAR in the timeline), so the element appears whole and in order, never as typed-out text.
+// - Stream placeholders (`⟪stream:<id>⟫`, streams.ts) become `stream` nodes, one visible character each like an anchor:
+//   once the typewriter reaches one, the renderer shows that stream's text so far, as plain text, and keeps it current
+//   as the stream goes on. The stream's text is never typed out and never parsed as HTML.
 
 export interface HtmlPolicy {
   tags: string[];
@@ -27,7 +31,9 @@ export type HtmlNode =
   | { type: 'text'; text: string }
   | { type: 'element'; tag: string; attributes: Record<string, string>; children: HtmlNode[] }
   // Where the detached element with this `text-anchor` goes.
-  | { type: 'anchor'; anchor: string };
+  | { type: 'anchor'; anchor: string }
+  // Where the text of the stream with this id goes (plain text, kept current by the renderer).
+  | { type: 'stream'; id: string };
 
 // An anchor's one character in the timeline (U+FFFC OBJECT REPLACEMENT CHARACTER).
 export const ANCHOR_CHAR = '\uFFFC';
@@ -343,14 +349,14 @@ export function parseHtml(
 export function htmlTextLength(nodes: HtmlNode[]): number {
   let n = 0;
   for (const node of nodes) {
-    n += node.type === 'text' ? node.text.length : node.type === 'anchor' ? 1 : htmlTextLength(node.children);
+    n += node.type === 'text' ? node.text.length : node.type === 'element' ? htmlTextLength(node.children) : 1;
   }
   return n;
 }
 
 export function htmlToText(nodes: HtmlNode[]): string {
   return nodes
-    .map((node) => (node.type === 'text' ? node.text : node.type === 'anchor' ? ANCHOR_CHAR : htmlToText(node.children)))
+    .map((node) => (node.type === 'text' ? node.text : node.type === 'element' ? htmlToText(node.children) : ANCHOR_CHAR))
     .join('');
 }
 
@@ -371,7 +377,17 @@ export function splitAnchors(nodes: HtmlNode[], anchors: string[]): HtmlNode[] {
   };
   return nodes.flatMap((node): HtmlNode[] => {
     if (node.type === 'element') return [{ ...node, children: splitAnchors(node.children, keys) }];
-    return node.type === 'anchor' ? [node] : split(node.text);
+    return node.type === 'text' ? split(node.text) : [node];
+  });
+}
+
+// Splits text nodes at stream placeholders (anywhere in the tree) into `stream` nodes.
+export function splitStreams(nodes: HtmlNode[]): HtmlNode[] {
+  return nodes.flatMap((node): HtmlNode[] => {
+    if (node.type === 'element') return [{ ...node, children: splitStreams(node.children) }];
+    if (node.type !== 'text') return [node];
+    return splitStreamPlaceholders(node.text)
+      .map((part): HtmlNode => (typeof part === 'string' ? { type: 'text', text: part } : { type: 'stream', id: part.stream }));
   });
 }
 
@@ -388,7 +404,7 @@ export function truncateHtml(nodes: HtmlNode[], visibleChars: number): HtmlNode[
       if (node.type === 'text') {
         out.push(node.text.length <= remaining ? node : { type: 'text', text: node.text.slice(0, remaining) });
         remaining -= node.text.length;
-      } else if (node.type === 'anchor') {
+      } else if (node.type === 'anchor' || node.type === 'stream') {
         out.push(node);
         remaining -= 1;
       } else {
@@ -401,13 +417,14 @@ export function truncateHtml(nodes: HtmlNode[], visibleChars: number): HtmlNode[
 }
 
 // Display text → what the typewriter animates and what gets rendered. `timeline` is the visible text with its
-// DCSTP_ markers (feed it to the typewriter) and an ANCHOR_CHAR per anchor; `nodes` hold the same text without markers.
+// DCSTP_ markers (feed it to the typewriter) and an ANCHOR_CHAR per anchor and per stream; `nodes` hold the same text
+// without markers.
 export function prepareDisplayText(
   raw: string,
   policy: HtmlPolicy | null,
   options?: HtmlOptions,
 ): { nodes: HtmlNode[]; timeline: string } {
-  const parsed = splitAnchors(parseHtml(raw, policy, options), options?.anchors ?? []);
+  const parsed = splitStreams(splitAnchors(parseHtml(raw, policy, options), options?.anchors ?? []));
   const timeline = htmlToText(parsed);
   if (!hasTimeLineStops(timeline)) return { nodes: parsed, timeline };
   const clean = (list: HtmlNode[]): HtmlNode[] =>

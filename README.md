@@ -41,11 +41,15 @@ const text = client.fillStreams(narration.narration);  // ⟪stream:str-…⟫ �
 client.closeStreams();                                  // e.g. when the view unmounts; the next command reopens it
 ```
 
-Stream text is plain text: never insert it as HTML. The pieces (`StreamTracker`, `StreamConnection`,
+Display text gets this for free: `prepareDisplayText` turns each placeholder into a `stream` node (one character of
+the timeline, like an anchor); render it as `state.streams[id]?.text ?? ''`, kept current. Stream text is plain text:
+never insert it as HTML. The pieces (`StreamTracker`, `StreamConnection`,
 `parseStreamMessage`, `streamIdsOf`) are exported for renderers that manage streams themselves.
 
 ## Changes
 
+- **0.9.0**: `prepareDisplayText` turns stream placeholders into `stream` nodes (`HtmlNode` gains a variant: a
+  renderer's tree walk must handle it); `splitStreams`, `splitStreamPlaceholders`.
 - **0.8.0**: streamed texts (`streams: true`, `fillStreams`, `closeStreams`, the `stream` event, `state.streams`,
   `state.streamToken`; `StreamTracker`, `StreamConnection` in `streams.ts`). Needs a server with `cmd=stream`; an
   older one ignores `accept-streams` and sends whole texts.

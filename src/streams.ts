@@ -11,6 +11,20 @@ export const STREAM_PLACEHOLDER_START = '⟪stream:';
 export const STREAM_PLACEHOLDER_END = '⟫';
 const PLACEHOLDER = /⟪stream:([^⟫\s]+)⟫/g;
 
+// A text split at its stream placeholders: plain strings and `{ stream: id }` in order; empty strings left out.
+export function splitStreamPlaceholders(text: string): (string | { stream: string })[] {
+  if (!text.includes(STREAM_PLACEHOLDER_START)) return text ? [text] : [];
+  const parts: (string | { stream: string })[] = [];
+  let at = 0;
+  for (const match of text.matchAll(PLACEHOLDER)) {
+    if (match.index > at) parts.push(text.slice(at, match.index));
+    parts.push({ stream: match[1] });
+    at = match.index + match[0].length;
+  }
+  if (at < text.length) parts.push(text.slice(at));
+  return parts;
+}
+
 // The commands and parameters of the stream protocol.
 export const STREAM_COMMAND = 'stream';
 export const STREAM_POLL_COMMAND = 'stream-poll';
