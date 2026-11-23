@@ -27,8 +27,28 @@ if (client.can('reload-xml')) await client.resetStory();
   `innerHTML`) and the visible text for typewriter effects.
 - `fetch` and storage are injectable (`MagidClientOptions`); by default the session lives in memory.
 
+### Streamed texts
+
+A server may stream text a tag goes on producing (a model's reply). Opt in with `streams: true`: the client then sends
+`accept-streams=true` with every request and keeps the session's stream connection (SSE; polling without
+`EventSource`). An entry that streams lists its streams in `stream-ids` and holds a placeholder per stream; show it
+through `fillStreams`, and render again on the `stream` event (or on every state change):
+
+```ts
+const client = new MagidClient({ baseUrl, clientType: 'pure', streams: true });
+client.on('stream', () => render());                    // a delta, a snapshot, or the stream's end arrived
+const text = client.fillStreams(narration.narration);  // ⟪stream:str-…⟫ → the text so far; insert it as text
+client.closeStreams();                                  // e.g. when the view unmounts; the next command reopens it
+```
+
+Stream text is plain text: never insert it as HTML. The pieces (`StreamTracker`, `StreamConnection`,
+`parseStreamMessage`, `streamIdsOf`) are exported for renderers that manage streams themselves.
+
 ## Changes
 
+- **Unreleased**: streamed texts (`streams: true`, `fillStreams`, `closeStreams`, the `stream` event, `state.streams`,
+  `state.streamToken`; `StreamTracker`, `StreamConnection` in `streams.ts`). Needs a server with `cmd=stream`; an
+  older one ignores `accept-streams` and sends whole texts.
 - **0.7.0**: `typingSchedule(timeline, typingConfig, skip)`: the typewriter's timing (`DCSTP_` offsets, typing by
   letter or word) as `{ text, steps: [{ at, length }] }`, so every renderer types the same way.
 - **0.6.1**: the story list the server sends with a new session (`available-xmls`, a JSON string) reaches

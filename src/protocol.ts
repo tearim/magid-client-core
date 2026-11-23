@@ -12,6 +12,8 @@ export interface MenuResponse {
   'menu-class'?: string;
   'menu-css'?: string;
   'menu-background-music'?: string;
+  // The streams whose placeholders (`⟪stream:<id>⟫`) the menu's texts hold (streams.ts); absent: nothing streams here.
+  'stream-ids'?: string[];
   // Populated client-side (MagidClient) with the detached elements of the same response batch that no narration
   // claimed — not present on the wire on this object.
   'detached-elements'?: DetachedElementResponse[];
@@ -62,6 +64,8 @@ export interface NarrationResponse {
   defer?: string;
   // `<show image="…">`: an image shown with the narration (an output field; `magid:///` already resolved).
   image?: string;
+  // The streams whose placeholders (`⟪stream:<id>⟫`) this text holds (streams.ts); absent: nothing streams here.
+  'stream-ids'?: string[];
   // Populated client-side (MagidClient): the batch's detached elements whose `text-anchor` is in this text.
   'detached-elements'?: DetachedElementResponse[];
 }
@@ -132,6 +136,8 @@ export interface ServerErrorPayload {
 export interface SessionResponse {
   'session-id': string;
   'file-request-token': string;
+  // Opens the session's stream connection (streams.ts); servers before streaming don't send it.
+  'stream-token'?: string;
   // The server sends a JSON string holding the list; MagidClient parses it into state.xmlList.
   'available-xmls'?: XmlEntry[] | string;
   'server-name'?: string;

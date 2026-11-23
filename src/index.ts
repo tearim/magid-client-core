@@ -12,5 +12,6 @@ export * from './scopeStylesheet.ts';
 export * from './capabilities.ts';
 export * from './html.ts';
 export * from './transport.ts';
+export * from './streams.ts';
 export * from './storage.ts';
 export * from './client.ts';

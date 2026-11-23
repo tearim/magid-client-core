@@ -20,6 +20,8 @@ export interface TransportConfig {
   // Session id, sent as the `Magid-Session` header.
   sessionId?: string;
   fetch?: FetchLike;
+  // Sends `accept-streams=true`: the server may then stream texts (streams.ts). Off: whole texts, as before.
+  acceptStreams?: boolean;
 }
 
 function resolveFetch(config: TransportConfig): FetchLike {
@@ -32,6 +34,7 @@ export function buildCommandUrl(config: TransportConfig, cmd: string, extra?: Re
   const url = new URL(config.baseUrl);
   url.searchParams.set('cmd', cmd);
   url.searchParams.set('client-type', config.clientType);
+  if (config.acceptStreams) url.searchParams.set('accept-streams', 'true');
   if (extra) {
     for (const [k, v] of Object.entries(extra)) {
       url.searchParams.set(k, v);

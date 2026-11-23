@@ -15,3 +15,7 @@ declare const console: {
   warn(...args: unknown[]): void;
   log(...args: unknown[]): void;
 };
+
+// The stream connection's polling fallback (streams.ts).
+declare function setInterval(handler: () => void, timeout?: number): unknown;
+declare function clearInterval(id: unknown): void;

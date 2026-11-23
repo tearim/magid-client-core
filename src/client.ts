@@ -6,6 +6,10 @@ import type { ConfigData, DetachedElementResponse, NarrationResponse, ServerErro
 import { memoryStorage, STORAGE_KEYS, type KeyValueStorage } from './storage.ts';
 import * as transport from './transport.ts';
 import type { FetchLike, TransportConfig } from './transport.ts';
+import {
+  parseStreamMessage, STREAM_ID_PARAM, STREAM_SNAPSHOT_COMMAND, StreamConnection, StreamTracker,
+  type EventSourceFactory, type StreamMessage, type StreamState,
+} from './streams.ts';
 
 export interface MagidClientState {
   baseUrl: string;
@@ -39,6 +43,10 @@ export interface MagidClientState {
   // HTML allowed in display text (null until `allowed-tags` is announced: plain text; see html.ts).
   allowedCommands: string[] | null;
   htmlPolicy: HtmlPolicy | null;
+  // Streamed texts (options.streams): the session's stream token, and what each stream has so far. A renderer shows
+  // an entry's text through fillStreams(text), which puts each stream's text in place of its placeholder.
+  streamToken: string | null;
+  streams: Record<string, StreamState>;
 }
 
 export interface MagidClientEvents {
@@ -46,6 +54,8 @@ export interface MagidClientEvents {
   notice: { message: string };
   // The story asked for a view-port mode (currently only 'maximized'); the renderer decides whether to go fullscreen.
   viewport: { mode: string };
+  // A stream's text changed (a delta, a snapshot, its end). `state.streams` has changed too.
+  stream: { id: string; state: StreamState };
 }
 
 export interface MagidClientOptions {
@@ -58,6 +68,11 @@ export interface MagidClientOptions {
   // Commands (server actions) this deployment never offers, whatever the server allows: 'reload-xml' or
   // 'xml:reload-xml'.
   disabledCommands?: string[];
+  // Take streamed texts: send `accept-streams=true` and keep the session's stream connection open. Off by default:
+  // whole texts, as before.
+  streams?: boolean;
+  // The EventSource to use (tests, polyfills); null polls instead. Defaults to globalThis.EventSource.
+  eventSource?: EventSourceFactory | null;
 }
 
 // The session's `available-xmls`: the server sends it as a JSON string; an array or `{ xmls: [...] }` is taken as is.
@@ -138,6 +153,11 @@ export class MagidClient {
   private readonly fetchImpl?: FetchLike;
   private readonly storage: KeyValueStorage;
   private readonly disabledCommands: string[];
+  private readonly streamsEnabled: boolean;
+  private readonly eventSource?: EventSourceFactory | null;
+  private readonly tracker = new StreamTracker();
+  private connection: StreamConnection | null = null;
+  private readonly snapshotsAsked = new Set<string>();
   // One command at a time: every command is chained onto the previous one.
   private queue: Promise<unknown> = Promise.resolve();
 
@@ -146,6 +166,8 @@ export class MagidClient {
     this.fetchImpl = options.fetch;
     this.storage = options.storage ?? memoryStorage();
     this.disabledCommands = options.disabledCommands ?? [];
+    this.streamsEnabled = options.streams ?? false;
+    this.eventSource = options.eventSource;
     const sessionId = this.storage.get(STORAGE_KEYS.SESSION_ID) || null;
     this.state = {
       baseUrl: options.baseUrl,
@@ -169,6 +191,8 @@ export class MagidClient {
       stylesheets: [],
       allowedCommands: null,
       htmlPolicy: null,
+      streamToken: this.storage.get(STORAGE_KEYS.STREAM_TOKEN) || null,
+      streams: {},
     };
   }
 
@@ -234,6 +258,7 @@ export class MagidClient {
 
   setBaseUrl(url: string): void {
     if (this.state.baseUrl === url) return;
+    this.closeStreams();
     this.set({
       baseUrl: url,
       xmlList: [],
@@ -369,7 +394,68 @@ export class MagidClient {
   }
 
   private transportConfig(sessionId: string | null): TransportConfig {
-    return { baseUrl: this.state.baseUrl, clientType: this.clientType, fetch: this.fetchImpl, sessionId: sessionId ?? undefined };
+    return {
+      baseUrl: this.state.baseUrl, clientType: this.clientType, fetch: this.fetchImpl, sessionId: sessionId ?? undefined,
+      acceptStreams: this.streamsEnabled,
+    };
+  }
+
+  // ---- streams ---------------------------------------------------------------------------------------------------
+
+  // A text with each stream placeholder replaced by that stream's text so far. Insert the result as text: stream text
+  // is never markup.
+  fillStreams(text: string): string {
+    return this.tracker.fillStreams(text);
+  }
+
+  // Ends the stream connection (a renderer unmounting). The next command opens it again.
+  closeStreams(): void {
+    this.connection?.stop();
+    this.connection = null;
+  }
+
+  // Opens the stream connection when streams are on and the session has a token.
+  private ensureStreams(): void {
+    if (!this.streamsEnabled || !this.state.streamToken || this.connection) return;
+    this.connection = new StreamConnection({
+      baseUrl: this.state.baseUrl,
+      clientType: this.clientType,
+      streamToken: this.state.streamToken,
+      fetch: this.fetchImpl,
+      eventSource: this.eventSource,
+      onMessage: (message) => this.applyStreamMessage(message),
+    });
+    this.connection.start();
+  }
+
+  // Applies one stream message (from the connection, or a snapshot this client asked for).
+  applyStreamMessage(message: StreamMessage): void {
+    const id = message['stream-id'];
+    const state = this.tracker.handle(message);
+    if (state) {
+      this.snapshotsAsked.delete(id);
+      this.set({ streams: { ...this.state.streams, [id]: state } });
+      this.emit('stream', { id, state });
+    } else if (this.tracker.stateOf(id)?.gap) {
+      void this.askSnapshot(id);
+    }
+  }
+
+  // After a gap: the stream's text so far (or its end), once per gap.
+  private async askSnapshot(id: string): Promise<void> {
+    if (this.snapshotsAsked.has(id)) return;
+    this.snapshotsAsked.add(id);
+    try {
+      const raw = await transport.sendCommand(this.transportConfig(this.state.sessionId), STREAM_SNAPSHOT_COMMAND,
+        { [STREAM_ID_PARAM]: id });
+      const events = (JSON.parse(raw) as { 'stream-events'?: unknown[] })['stream-events'] ?? [];
+      for (const event of events) {
+        const message = parseStreamMessage(event);
+        if (message) this.applyStreamMessage(message);
+      }
+    } catch {
+      this.snapshotsAsked.delete(id);  // the stream's end will still come
+    }
   }
 
   private request(command: Command, extra: Record<string, string>, sessionId: string | null): Promise<string> {
@@ -386,6 +472,7 @@ export class MagidClient {
 
   // Runs one command including the sync/session recovery protocol. Never throws; failures end up in state/notices.
   private async run(command: Command): Promise<boolean> {
+    this.ensureStreams();  // a session restored from storage reopens its stream connection here
     const action = 'action' in command ? command.action : null;
     if (action !== null && !this.can(action)) {
       this.emit('notice', { message: `"${action}" is not available.` });
@@ -507,12 +594,19 @@ export class MagidClient {
       patch.fileRequestToken = token;
       this.storage.set(STORAGE_KEYS.FILE_REQUEST_TOKEN, token);
     }
+    const streamToken = el.data['stream-token'];
+    if (streamToken && streamToken !== this.state.streamToken) {
+      patch.streamToken = streamToken;
+      this.storage.set(STORAGE_KEYS.STREAM_TOKEN, streamToken);
+      this.closeStreams();  // a new session: a new connection
+    }
     if (xmls) patch.xmlList = xmlListOf(xmls);
     if (serverName !== undefined) patch.serverName = serverName;
     if (serverVersion !== undefined) patch.serverVersion = serverVersion;
     if (serverDescription !== undefined) patch.serverDescription = serverDescription;
     if (serverIcon !== undefined) patch.serverIcon = serverIcon;
     this.set(patch);
+    this.ensureStreams();
   }
 
   private applyConfig(data: ConfigData): void {
@@ -546,6 +640,10 @@ export class MagidClient {
   private clearSession(): void {
     this.storage.set(STORAGE_KEYS.SESSION_ID, '');
     this.storage.set(STORAGE_KEYS.FILE_REQUEST_TOKEN, '');
-    this.set({ sessionId: null, fileRequestToken: null });
+    this.storage.set(STORAGE_KEYS.STREAM_TOKEN, '');
+    this.closeStreams();
+    this.tracker.clear();
+    this.snapshotsAsked.clear();
+    this.set({ sessionId: null, fileRequestToken: null, streamToken: null, streams: {} });
   }
 }

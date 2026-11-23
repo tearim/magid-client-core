@@ -17,4 +17,5 @@ export function memoryStorage(initial: Record<string, string> = {}): KeyValueSto
 export const STORAGE_KEYS = {
   SESSION_ID: 'session.id',
   FILE_REQUEST_TOKEN: 'session.file-request-token',
+  STREAM_TOKEN: 'session.stream-token',
 } as const;

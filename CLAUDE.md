@@ -42,7 +42,7 @@ exists, and records the current baseline. Then:
 
 - **Server** (`C:\developer\com.zarterstein`, Java, private): the source of truth for the wire protocol. Command handling
   is in `story-server/agnostic` (`MagidServerCoreActions`, `MagidServerRouter`), the MagidML tag reference is
-  `MAGID-XML-DSL.md`, stories (real `magid:///…` URLs, CSS classes, `implied-classes-of:` vars) are in `content/`. Read it
+  `MAGIDML-TAG-REFERENCE.md`, stories (real `magid:///…` URLs, CSS classes, `implied-classes-of:` vars) are in `content/`. Read it
   when a protocol question comes up; don't change it from here.
 - **Clients** built on this package: `magid-client-rct` (React, the reference consumer; `C:\developer\magid-client-rct`),
   later `-ang` (Angular) and `-pure` (plain pages). Its history before the extraction (2026-10-23) lives there too.
@@ -155,6 +155,18 @@ signals); `subscribe` and `on('notice' | 'viewport')` observe it. Renderers neve
     server actions in `SERVER_ACTIONS` are gated; story replies (`send`) are never checked. Not announced yet = everything allowed.
     The operator's `disabledCommands` (`'reload-xml'` or `'xml:reload-xml'`) always win.
   - `allowed-tags` / `allowed-tag-attributes` (comma-separated) → `state.htmlPolicy`; see "HTML in display text".
+
+### Streamed texts (`streams.ts`)
+
+The server's `development-docs/STREAMING-DESIGN.md` is the protocol. Opt-in (`MagidClientOptions.streams`): every
+request carries `accept-streams=true` (`TransportConfig.acceptStreams`); the session's `stream-token` (stored as
+`STORAGE_KEYS.STREAM_TOKEN`) opens one `StreamConnection` per session (SSE via an injectable `EventSourceLike`, else
+polling `cmd=stream-poll`), opened when a session arrives or a command runs, closed with the session or by
+`closeStreams()`. `StreamTracker` holds the rules: a delta numbered last + 1 appends, any other number is a gap (deltas
+ignored until a snapshot or the end; `MagidClient` then asks `cmd=stream-snapshot&stream-id=…` once); a snapshot
+replaces the text; `done` replaces it with `value` and ends the stream. An entry that streams has `stream-ids` and a
+placeholder `⟪stream:<id>⟫` per stream; renderers show it through `fillStreams(text)` (plain text, never markup) and
+re-render on the `stream` event or on `state.streams`.
 
 ### HTML in display text (`html.ts`)
 
