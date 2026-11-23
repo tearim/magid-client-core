@@ -46,7 +46,7 @@ Stream text is plain text: never insert it as HTML. The pieces (`StreamTracker`,
 
 ## Changes
 
-- **Unreleased**: streamed texts (`streams: true`, `fillStreams`, `closeStreams`, the `stream` event, `state.streams`,
+- **0.8.0**: streamed texts (`streams: true`, `fillStreams`, `closeStreams`, the `stream` event, `state.streams`,
   `state.streamToken`; `StreamTracker`, `StreamConnection` in `streams.ts`). Needs a server with `cmd=stream`; an
   older one ignores `accept-streams` and sends whole texts.
 - **0.7.0**: `typingSchedule(timeline, typingConfig, skip)`: the typewriter's timing (`DCSTP_` offsets, typing by
